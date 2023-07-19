@@ -1,10 +1,4 @@
 #include <DataHandlerClass.h>
-#include <stdio.h> 
-#include <time.h> 
-#include <sys/time.h>
-#include <string.h>
-#include <iostream>
-//#include "boost/date_time/posix_time/posix_time.hpp"
 
 DataUARTHandler::DataUARTHandler(ros::NodeHandle* nh) :
 currentBufp(&pingPongBuffers[0]) , nextBufp(&pingPongBuffers[1])
@@ -33,10 +27,7 @@ currentBufp(&pingPongBuffers[0]) , nextBufp(&pingPongBuffers[1])
     nh->getParam("/ti_mmwave/range_resolution", vrange);
     nh->getParam("/ti_mmwave/max_doppler_vel", max_vel);
     nh->getParam("/ti_mmwave/doppler_vel_resolution", vvel);
-    //added by leicheng
-    nh->getParam("/ti_mmwave/startFreq", startFreq);
-    fc_chirp = startFreq * 1e9 + BW / 2;
-    ////////////////////////////////////////////////////////////////////////////////
+
     ROS_INFO("\n\n=============\nList of parameters\n=============\n"
              "Number of range samples: %d\nNumber of chirps: %d\n"
              "f_s: %.3f MHz\nf_c: %.3f GHz\nBandwidth: %.3f MHz\n"
@@ -278,21 +269,10 @@ void *DataUARTHandler::sortIncomingData( void )
     int j = 0;
     float maxElevationAngleRatioSquared;
     float maxAzimuthAngleRatio;
-    //added by leicheng
-    float velocityRes = 0;
-    float dopplerRes = 0;
-	int radar_frame_idx=0;   
-    struct timeval    tv; 
-    struct timezone   tz;        
-    struct tm         *p;
-    char       buf[80];
-    char       buf2[80];
     
     boost::shared_ptr<pcl::PointCloud<radar_pcl::PointXYZIVR>> RScan(
                                   new pcl::PointCloud<radar_pcl::PointXYZIVR>);
     ti_mmwave_rospkg::RadarScan radarscan;
-    //ti_mmwave_rospkg::RadarScan *radarscan_temp = NULL; // for temporary storing add_by_leicheng
-	
 
     //wait for first packet to arrive
     pthread_mutex_lock(&countSync_mutex);
@@ -430,17 +410,7 @@ void *DataUARTHandler::sortIncomingData( void )
             RScan->width = mmwData.numObjOut;
             RScan->is_dense = 1;
             RScan->points.resize(RScan->width * RScan->height);
-            //added by leicheng
-             // if(radarscan_temp == NULL)
-             //{
-             //    radarscan_temp = (ti_mmwave_rospkg::RadarScan * )malloc(mmwData.numObjOut * sizeof(ti_mmwave_rospkg::RadarScan));
-             //}else{
-             //   free(radarscan_temp);
-             //   radarscan_temp = NULL;
-             //   radarscan_temp = (ti_mmwave_rospkg::RadarScan * )malloc(mmwData.numObjOut * sizeof(ti_mmwave_rospkg::RadarScan));
-
-             //}
-
+            
             // Calculate ratios for max desired elevation and azimuth angles
             if ((maxAllowedElevationAngleDeg >= 0) &&
             (maxAllowedElevationAngleDeg < 90)) {
@@ -583,67 +553,32 @@ void *DataUARTHandler::sortIncomingData( void )
                     RScan->points[i].z = mmwData.objOut_cartes.z;
 
                     RScan->points[i].velocity = mmwData.objOut_cartes.velocity;
-                    RScan->points[i].range = sqrt(RScan->points[i].x*RScan->points[i].x + RScan->points[i].y*RScan->points[i].y + RScan->points[i].z*RScan->points[i].z);
+                    RScan->points[i].range = sqrt(radarscan.x*radarscan.x +
+                        radarscan.y*radarscan.y + radarscan.z*radarscan.z);
 
-		            //radarscan.header.frame_id = frameID;
-                    //radarscan.header.stamp = ros::Time::now();
+                    radarscan.header.frame_id = frameID;
+                    radarscan.header.stamp = ros::Time::now();
 
-                    //radarscan.point_id = i;
-                    //radarscan.x = mmwData.objOut_cartes.y;
-                    //radarscan.y = -mmwData.objOut_cartes.x;
-                    //radarscan.z = mmwData.objOut_cartes.z;
-                    //radarscan.velocity = mmwData.objOut_cartes.velocity;
+                    radarscan.point_id = i;
+                    radarscan.x = mmwData.objOut_cartes.y;
+                    radarscan.y = -mmwData.objOut_cartes.x;
+                    radarscan.z = mmwData.objOut_cartes.z;
+                    radarscan.velocity = mmwData.objOut_cartes.velocity;
 
-                    //radarscan.range = sqrt(radarscan.x*radarscan.x +
-                    //        radarscan.y*radarscan.y + radarscan.z*radarscan.z);
-                    //added by leicheng, idea from 'radar-lab/patient_monitoring'
-                    velocityRes = 3.0e8 / (2.0 * nd * 2 * fc_chirp * PRI);
-                    dopplerRes = velocityRes;
-                    //radarscan.doppler_bin = round(mmwData.objOut_cartes.velocity / dopplerRes + nd/2);
-                    //////////////////////////////////////////////////////////////////////////////////////////
-                    //radarscan.bearing = std::atan2(-mmwData.objOut_cartes.x,
-                    //    mmwData.objOut_cartes.y) / M_PI * 180;		
-		            RScan->points[i].doppler_bin=round(mmwData.objOut_cartes.velocity / dopplerRes + nd/2);
-                    RScan->points[i].bearing = std::atan2(-mmwData.objOut_cartes.x,mmwData.objOut_cartes.y) / M_PI * 180;
- 
-                    //radarscan_temp[i].header.frame_id = frameID;
-                    //radarscan_temp[i].header.stamp = ros::Time::now();
+                    radarscan.range = sqrt(radarscan.x*radarscan.x +
+                            radarscan.y*radarscan.y + radarscan.z*radarscan.z);
+                    radarscan.doppler_bin = (uint16_t)(
+                        mmwData.detList.dopplerIdx + nd / 2);
+                    radarscan.bearing = std::atan2(-mmwData.objOut_cartes.x,
+                        mmwData.objOut_cartes.y) / M_PI * 180;
 
+                    radarscan.intensity = (float) mmwData.sideInfo.snr / 10.0;
                     
-					/*
-					add by leicheng
-					Converting these coordinate information into the RScan format that ROS can accept involves a coordinate axis conversion problem.
-                    The default x-axis of ROS is parallel to the default y-axis of EVM data;
-                    Its y-axis is parallel to the x-axis of the EMV and points in the opposite direction;
-                    The two z-axis overlap.
-					*/
-/*
-		    radarscan_temp[i].point_id = i; 
-                    radarscan_temp[i].x = mmwData.objOut_cartes.y;
-                    radarscan_temp[i].y = -mmwData.objOut_cartes.x;
-                    radarscan_temp[i].z = mmwData.objOut_cartes.z;
-                    radarscan_temp[i].velocity = mmwData.objOut_cartes.velocity;
-
-                    radarscan_temp[i].range = sqrt(radarscan_temp[i].x*radarscan_temp[i].x +
-                            radarscan_temp[i].y*radarscan_temp[i].y + radarscan_temp[i].z*radarscan_temp[i].z);
-                    //radarscan.doppler_bin = (uint16_t)(
-                    //    mmwData.detList.dopplerIdx + nd / 2);
-                    //added by leicheng, idea from 'radar-lab/patient_monitoring'
-                    velocityRes = 3.0e8 / (2.0 * nd * 2 * fc_chirp * PRI);
-                    dopplerRes = velocityRes;
-                    radarscan_temp[i].doppler_bin = round(mmwData.objOut_cartes.velocity / dopplerRes + nd/2);
-                    //////////////////////////////////////////////////////////////////////////////////////////
-                    radarscan_temp[i].bearing = std::atan2(-mmwData.objOut_cartes.x,
-                        mmwData.objOut_cartes.y) / M_PI * 180; 
-
-                    //radarscan_temp[i].intensity = (float) mmwData.sideInfo.snr / 10.0;
-                    */
 
                     // For SDK 3.x, intensity is replaced by snr in
                     // sideInfo and is parsed in the READ_SIDE_INFO code
                 }
-                /*
-				//commented by leicheng 
+
                 if (((maxElevationAngleRatioSquared == -1) ||
                              (((RScan->points[i].z * RScan->points[i].z) /
                              (RScan->points[i].x * RScan->points[i].x +
@@ -656,9 +591,8 @@ void *DataUARTHandler::sortIncomingData( void )
                             (RScan->points[i].x != 0)
                            )
                 {
-                    radar_scan_pub.publish(radarscan);//this for output radar data, for each point(i.e. i) we run this command one time.
+                    radar_scan_pub.publish(radarscan);
                 }
-		*/		
                 i++;
             }
 
@@ -689,65 +623,6 @@ void *DataUARTHandler::sortIncomingData( void )
                     // Use snr for "intensity" field
                     // (divide by 10 since unit of snr is 0.1dB)
                     RScan->points[i].intensity = mmwData.sideInfo.snr / 10.0;
-		//added by leicheng  
-		    //radarscan.header.frame_id       = radarscan_temp[i].header.frame_id;
-            	    //radarscan.header.stamp          = radarscan_temp[i].header.stamp;
-/*
-                    radarscan.header.frame_id       = frameID;
-                    radarscan.header.stamp          = ros::Time::now();
-                    radarscan.point_id              = radarscan_temp[i].point_id;
-                    radarscan.x                     = radarscan_temp[i].x;
-                    radarscan.y                     = radarscan_temp[i].y;
-                    radarscan.z                     = radarscan_temp[i].z;
-                    radarscan.range                 = radarscan_temp[i].range;
-                    radarscan.velocity              = radarscan_temp[i].velocity;
-                    radarscan.doppler_bin           = radarscan_temp[i].doppler_bin;
-                    radarscan.bearing               = radarscan_temp[i].bearing;
-*/
-                    gettimeofday(&tv, &tz);                    
-                    //p = localtime(&tv.tv_sec); 
-                    //sprintf(buf,"%d%d%d%d%d%d.%ld", 1900+p->tm_year, 1+p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec, tv.tv_usec);
-                    p = localtime(&tv.tv_sec);
-                    // Format time, "yyyy-mm-dd hh:mm:ss.usec"
-                    strftime(buf, sizeof(buf), "%Y%m%d%H%M%S", p);
-                    sprintf(buf2,"%s.%ld", buf, tv.tv_usec);
-		            radarscan.header.frame_id       = frameID;
-                    radarscan.header.stamp          = ros::Time::now();
-                    //boost::posix_time::ptime real_posix_time = ros::Time::now().toBoost();
-                    //std::string iso_time_str = boost::posix_time::to_iso_string(real_posix_time);
-                    //strcpy(radarscan.time_human, buf);
-                    //radarscan.time_human            = iso_time_str;  
-                    std::string time_str = buf2;
-					radarscan.time_human            = time_str;
-                    //radarscan.time_test            = "test_time";
-                    radarscan.point_id              = i;
-					radarscan.radar_frame_idx       = radar_frame_idx ;
-                    radarscan.x                     = RScan->points[i].x;
-                    radarscan.y                     = RScan->points[i].y;
-                    radarscan.z                     = RScan->points[i].z;
-                    radarscan.range                 = RScan->points[i].range;
-                    radarscan.velocity              = RScan->points[i].velocity;
-                    radarscan.doppler_bin           = RScan->points[i].doppler_bin;
-                    radarscan.bearing               = RScan->points[i].bearing;		
-                    //radarscan.intensity             = RScan->points[i].intensity;
-					radarscan.intensity             = mmwData.sideInfo.snr;
-					radarscan.intensity_snr_noise             = mmwData.sideInfo.snr+mmwData.sideInfo.noise;
-					radarscan.noise             = mmwData.sideInfo.noise;
-		    if (((maxElevationAngleRatioSquared == -1) ||
-                            (((RScan->points[i].z * RScan->points[i].z) /
-                            (RScan->points[i].x * RScan->points[i].x +
-                            RScan->points[i].y * RScan->points[i].y)
-                             ) < maxElevationAngleRatioSquared)
-                           ) &&
-                           ((maxAzimuthAngleRatio == -1) ||
-                           (fabs(RScan->points[i].y /
-                           RScan->points[i].x) < maxAzimuthAngleRatio)) &&
-                           (RScan->points[i].x != 0)
-                          )
-                    {
-                        radar_scan_pub.publish(radarscan); 
-                    }
-					//////////////////////////////////////
                 }
             }
             else  // else just skip side info section if we have not already
@@ -764,8 +639,7 @@ void *DataUARTHandler::sortIncomingData( void )
               currentDatap += tlvLen;
             }
             
-            radar_frame_idx =radar_frame_idx +1;
-			sorterState = CHECK_TLV_TYPE;
+            sorterState = CHECK_TLV_TYPE;
             
             break;
 

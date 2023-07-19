@@ -73,10 +73,6 @@ private:
     float vrange;
     float max_vel;
     float vvel;
-    //added by leicheng
-    float fc_chirp;
-    float startFreq;
-    ///////////////////////////
 
     char* frameID;
     /*Contains the name of the serial port*/

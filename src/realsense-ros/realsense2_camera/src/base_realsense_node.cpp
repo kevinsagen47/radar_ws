@@ -1889,19 +1889,19 @@ void BaseRealSenseNode::updateStreamCalibData(const rs2::video_stream_profile& v
     _camera_info[stream_index].height = intrinsic.height;
     _camera_info[stream_index].header.frame_id = _optical_frame_id[stream_index];
 
-    _camera_info[stream_index].K.at(0) = intrinsic.fx;
-    _camera_info[stream_index].K.at(2) = intrinsic.ppx;
-    _camera_info[stream_index].K.at(4) = intrinsic.fy;
-    _camera_info[stream_index].K.at(5) = intrinsic.ppy;
+    _camera_info[stream_index].K.at(0) = 920.970748;//intrinsic.fx;
+    _camera_info[stream_index].K.at(2) = 654.097670;//intrinsic.ppx;
+    _camera_info[stream_index].K.at(4) = 922.923304;//intrinsic.fy;
+    _camera_info[stream_index].K.at(5) = 325.524188;//intrinsic.ppy;
     _camera_info[stream_index].K.at(8) = 1;
 
-    _camera_info[stream_index].P.at(0) = _camera_info[stream_index].K.at(0);
+    _camera_info[stream_index].P.at(0) = 933.819336;//_camera_info[stream_index].K.at(0);
     _camera_info[stream_index].P.at(1) = 0;
-    _camera_info[stream_index].P.at(2) = _camera_info[stream_index].K.at(2);
+    _camera_info[stream_index].P.at(2) = 661.478722;//_camera_info[stream_index].K.at(2);
     _camera_info[stream_index].P.at(3) = 0;
     _camera_info[stream_index].P.at(4) = 0;
-    _camera_info[stream_index].P.at(5) = _camera_info[stream_index].K.at(4);
-    _camera_info[stream_index].P.at(6) = _camera_info[stream_index].K.at(5);
+    _camera_info[stream_index].P.at(5) = 940.406799;//_camera_info[stream_index].K.at(4);
+    _camera_info[stream_index].P.at(6) = 319.195221;//_camera_info[stream_index].K.at(5);
     _camera_info[stream_index].P.at(7) = 0;
     _camera_info[stream_index].P.at(8) = 0;
     _camera_info[stream_index].P.at(9) = 0;
@@ -1941,10 +1941,17 @@ void BaseRealSenseNode::updateStreamCalibData(const rs2::video_stream_profile& v
         _camera_info[stream_index].distortion_model = "plumb_bob";
     }
     _camera_info[stream_index].D.resize(coeff_size);
+    /*
     for (int i = 0; i < coeff_size; i++)
     {
         _camera_info[stream_index].D.at(i) = intrinsic.coeffs[i];
     }
+    */
+    _camera_info[stream_index].D.at(0) = 0.106970;
+    _camera_info[stream_index].D.at(1) = -0.165271;
+    _camera_info[stream_index].D.at(2) = -0.009863;
+    _camera_info[stream_index].D.at(3) = 0.005088;
+    _camera_info[stream_index].D.at(4) = 0.000000;
 
     if (stream_index == DEPTH && _enable[DEPTH] && _enable[COLOR])
     {

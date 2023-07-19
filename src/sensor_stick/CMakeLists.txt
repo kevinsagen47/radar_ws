@@ -1,27 +1,21 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(ti_mmwave_rospkg)
+project(sensor_stick)
 
 ## Add support for C++11, supported in ROS Kinetic and newer
- add_definitions(-std=c++11)
+# add_definitions(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  nodelet
-  roscpp
-  serial
-  std_msgs
-  sensor_msgs
-  message_generation
-  pluginlib
+	dynamic_reconfigure
+	pcl_conversions
+	pcl_ros
+	roscpp
+	rospy
+	roslint
+	sensor_msgs
 )
-
-find_package(Boost REQUIRED)
-
-find_package(Threads REQUIRED)
-
-find_package(PCL 1.7.2 REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -57,16 +51,18 @@ find_package(PCL 1.7.2 REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  RadarScan.msg
-)
+# add_message_files(
+#   FILES
+#   Message1.msg
+#   Message2.msg
+# )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  mmWaveCLI.srv
-)
+# add_service_files(
+#   FILES
+#   Service1.srv
+#   Service2.srv
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -76,11 +72,10 @@ add_service_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  sensor_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   std_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -97,10 +92,10 @@ generate_messages(
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
+ generate_dynamic_reconfigure_options(
+   config/Pcl.cfg
 #   cfg/DynReconf2.cfg
-# )
+ )
 
 ###################################
 ## catkin specific configuration ##
@@ -112,10 +107,10 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES mmwave
-  #CATKIN_DEPENDS nodelet roscpp serial std_msgs
-  DEPENDS system_lib
+#  INCLUDE_DIRS include
+#  LIBRARIES sensor_stick
+#  CATKIN_DEPENDS roscpp rospy std_msgs
+#  DEPENDS system_lib
 )
 
 ###########
@@ -124,39 +119,25 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
-include_directories( include
+include_directories(include)
+include_directories(
   ${catkin_INCLUDE_DIRS}
-  ${ti_mmwave_rospkg_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}
-  ${pthread_INCLUDE_DIRS}
-  ${rt_INCLUDE_DIRS}
 )
-
-link_directories( ${Boost_LIBRARIES_DIRS} )
-
-link_directories( ${PCL_LIBRARY_DIRS} )
-
-add_definitions(${PCL_DEFINITIONS})
 
 ## Declare a C++ library
-add_library(mmwave
-  src/mmWaveDataHdl.cpp
-  src/mmWaveCommSrv.cpp
-  src/DataHandlerClass.cpp
-  src/mmWaveQuickConfig.cpp
-  src/ParameterParser.cpp
-)
+# add_library(${PROJECT_NAME}
+#   src/${PROJECT_NAME}/sensor_stick.cpp
+# )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-add_dependencies(mmwave ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/ti_mmwave_rospkg_node.cpp)
+add_executable(cloud_transformer src/cloud_transformer.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -166,13 +147,12 @@ add_dependencies(mmwave ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TA
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(cloud_transformer ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
-
+target_link_libraries(cloud_transformer
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############
@@ -207,26 +187,18 @@ add_dependencies(mmwave ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TA
 #   # myfile2
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
-set (CMAKE_CXX_STANDARD 11)
-
-add_executable(${PROJECT_NAME} src/mmWaveLoader.cpp include/point_types.h)
-target_link_libraries(mmwave ${serial_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} mmwave ${serial_LIBRARIES})
-add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} mmwave ${serial_EXPORTED_TARGETS})
-
-add_executable(mmWaveQuickConfig src/mmWaveQuickConfig.cpp)
-target_link_libraries(mmWaveQuickConfig ${catkin_LIBRARIES} mmwave)
-add_dependencies(mmWaveQuickConfig ${catkin_EXPORTED_TARGETS} mmwave)
 
 #############
 ## Testing ##
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_ti_mmwave_rospkg.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_sensor_stick.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+roslint_cpp(src/cloud_transformer.cpp)
+#roslint_cpp(srcipts/template.py)
