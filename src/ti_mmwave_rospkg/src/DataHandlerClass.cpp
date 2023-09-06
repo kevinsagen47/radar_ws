@@ -9,8 +9,8 @@
 DataUARTHandler::DataUARTHandler(ros::NodeHandle* nh) :
 currentBufp(&pingPongBuffers[0]) , nextBufp(&pingPongBuffers[1])
 {
-    DataUARTHandler_pub = nh->advertise<sensor_msgs::PointCloud2>
-        ("/ti_mmwave/radar_scan_pcl", 100);
+    //DataUARTHandler_pub = nh->advertise<sensor_msgs::PointCloud2>("/ti_mmwave/radar_scan_pcl", 100);
+    DataUARTHandler_pub = nh->advertise<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("/ti_mmwave/radar_scan_pcl", 100);
     radar_scan_pub = nh->advertise<ti_mmwave_rospkg::RadarScan>
         ("/ti_mmwave/radar_scan", 100);
     marker_pub = nh->advertise<visualization_msgs::Marker>
@@ -718,10 +718,10 @@ void *DataUARTHandler::sortIncomingData( void )
                     //strcpy(radarscan.time_human, buf);
                     //radarscan.time_human            = iso_time_str;  
                     std::string time_str = buf2;
-					radarscan.time_human            = time_str;
+					///////////////////radarscan.time_human            = time_str;
                     //radarscan.time_test            = "test_time";
                     radarscan.point_id              = i;
-					radarscan.radar_frame_idx       = radar_frame_idx ;
+					////////////////////////radarscan.radar_frame_idx       = radar_frame_idx ;
                     radarscan.x                     = RScan->points[i].x;
                     radarscan.y                     = RScan->points[i].y;
                     radarscan.z                     = RScan->points[i].z;
@@ -731,8 +731,8 @@ void *DataUARTHandler::sortIncomingData( void )
                     radarscan.bearing               = RScan->points[i].bearing;		
                     //radarscan.intensity             = RScan->points[i].intensity;
 					radarscan.intensity             = mmwData.sideInfo.snr;
-					radarscan.intensity_snr_noise             = mmwData.sideInfo.snr+mmwData.sideInfo.noise;
-					radarscan.noise             = mmwData.sideInfo.noise;
+					/////////////////radarscan.intensity_snr_noise             = mmwData.sideInfo.snr+mmwData.sideInfo.noise;
+					////////////////////////radarscan.noise             = mmwData.sideInfo.noise;
 		    if (((maxElevationAngleRatioSquared == -1) ||
                             (((RScan->points[i].z * RScan->points[i].z) /
                             (RScan->points[i].x * RScan->points[i].x +

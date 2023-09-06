@@ -37,8 +37,7 @@
 #include <utility>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include "kf_tracker/point_types.h"
-#include <pcl/point_types.h>
+
 using namespace std;
 using namespace cv;
 
@@ -327,32 +326,7 @@ void publish_cloud(ros::Publisher &pub,
   pub.publish(*clustermsg);
 }
 
-/*
-
-static void radarTargetArrayToROSCloud( const ainstein_radar_msgs::RadarTargetArray& target_array,
-					    sensor_msgs::PointCloud2& ros_cloud )
-    {
-      pcl::PointCloud<PointRadarTarget> pcl_cloud;
-      radarTargetArrayToPclCloud( target_array, pcl_cloud );
-
-      pcl::toROSMsg( pcl_cloud, ros_cloud );
-      ros_cloud.header.frame_id = target_array.header.frame_id;
-      ros_cloud.header.stamp = target_array.header.stamp;
-    }
-
-    
-    static void rosCloudToRadarTargetArray( const sensor_msgs::PointCloud2& ros_cloud,
-					    ainstein_radar_msgs::RadarTargetArray& target_array )
-    {
-      // Convert to PCL cloud and use the appropriate conversion function above
-      pcl::PointCloud<PointRadarTarget> pcl_cloud;
-      pcl::fromROSMsg( ros_cloud, pcl_cloud );
-
-      pclCloudToRadarTargetArray( pcl_cloud, target_array );
-    }
-*/
-//void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)	
-void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
+void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)
 
 {
   // cout<<"IF firstFrame="<<firstFrame<<"\n";
@@ -417,16 +391,9 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     /* Creating the KdTree from input point cloud*/
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
         new pcl::search::KdTree<pcl::PointXYZ>);
-    
-    //pcl::PointCloud2::Ptr clustermsg(new sensor_msgs::PointCloud2);
 
-    sensor_msgs::PointCloud2 pcl_pc2;
-    pcl::toROSMsg(*input,pcl_pc2);
+    pcl::fromROSMsg(*input, *input_cloud);
 
-    //pcl::fromROSMsg(*input, *input_cloud);
-    //pcl::fromPCLPointCloud2(pcl_pc2,*input_cloud);
-    //pcl_conversions::toPCL(pcl_pc2,*input_cloud);
-    pcl::fromROSMsg(pcl_pc2,*input_cloud);
     tree->setInputCloud(input_cloud);
 
     std::vector<pcl::PointIndices> cluster_indices;
@@ -559,19 +526,9 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
         new pcl::PointCloud<pcl::PointXYZ>);
     /* Creating the KdTree from input point cloud*/
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
-        //new pcl::search::KdTree<radar_pcl::PointXYZIVR>);
         new pcl::search::KdTree<pcl::PointXYZ>);
-    //
-    sensor_msgs::PointCloud2 pcl_pc2;
-    //pcl_conversions::toPCL not work
-    pcl::toROSMsg(*input,pcl_pc2);
 
-    //pcl::fromROSMsg(*input, *input_cloud);
-    //pcl::fromPCLPointCloud2(pcl_pc2,*input_cloud);
-    //pcl::PointCloud<pcl::PointXYZI> in_cloud;
-    //pcl::fromROSMsg(in_msg, in_cloud);
-    //pcl_conversions::toPCL(pcl_pc2,*input_cloud);
-    pcl::fromROSMsg(pcl_pc2,*input_cloud);
+    pcl::fromROSMsg(*input, *input_cloud);
 
     tree->setInputCloud(input_cloud);
 
@@ -723,7 +680,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     }
   }
 }
-//*
+
 int main(int argc, char **argv) {
   // ROS init
   ros::init(argc, argv, "kf_tracker");
@@ -735,9 +692,7 @@ int main(int argc, char **argv) {
   cout << "About to setup callback\n";
 
   // Create a ROS subscriber for the input point cloud
-  //ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
-  ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb);
-  //ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb);
+  ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
   // Create a ROS publisher for the output point cloud
   pub_cluster0 = nh.advertise<sensor_msgs::PointCloud2>("cluster_0", 1);
   pub_cluster1 = nh.advertise<sensor_msgs::PointCloud2>("cluster_1", 1);
@@ -748,39 +703,14 @@ int main(int argc, char **argv) {
   // Subscribe to the clustered pointclouds
   // ros::Subscriber c1=nh.subscribe("ccs",100,KFT);
   objID_pub = nh.advertise<std_msgs::Int32MultiArray>("obj_id", 1);
-  
+  /* Point cloud clustering
+   */
 
   // cc_pos=nh.advertise<std_msgs::Float32MultiArray>("ccs",100);//clusterCenter1
   markerPub = nh.advertise<visualization_msgs::MarkerArray>("viz", 1);
 
+  /* Point cloud clustering
+   */
 
   ros::spin();
 }
-//*/
-/*
-void cloud_cb2(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
-{
-    //Eigen::VectorXf ev = Eigen::VectorXf::Map((*input).points[0], 17);
-    //cout<<ev<<"\n";
-    cout<<(*input).points[0].x<<"\n";
-    //cout<<Eigen::VectorXf((*input).points)<<"\n";
-    //cout << typeid((*input).points).name() << '\n';
-
-}
-
-int main(int argc, char **argv) {
-  // ROS init
-  ros::init(argc, argv, "kf_tracker");
-  ros::NodeHandle nh;
-  std::string topic = nh.resolveName("point_types");
-
-  // Publishers to publish the state of the objects (pos and vel)
-  // objState1=nh.advertise<geometry_msgs::Twist> ("obj_1",1);
-
-  cout << "About to setup callback\n";
-
-  // Create a ROS subscriber for the input point cloud
-  ///ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
-  ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb2);
-  ros::spin();
-}*/

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(multi_object_tracking_lidar)
-add_definitions(-std=c++11)
+
 set(CMAKE_CXX_STANDARD 14)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -82,7 +82,6 @@ find_package( OpenCV REQUIRED )
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
 #  INCLUDE_DIRS include
 #  LIBRARIES kf_tracker
 #  CATKIN_DEPENDS pck_ros roscpp sensor_msgs
@@ -110,12 +109,9 @@ include_directories(
 
 ## Declare a cpp executable
 # add_executable(kf_tracker_node src/kf_tracker_node.cpp)
-add_executable( kf_tracker src/main.cpp include/kf_tracker/point_types.h)
+add_executable( kf_tracker src/main.cpp )
 target_link_libraries ( kf_tracker ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-
-#add_executable( msg_test src/msg_test.cpp include/kf_tracker/point_types.h)
-#target_link_libraries ( kf_tracker ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
-
+ 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(kf_tracker_node kf_tracker_generate_messages_cpp)
