@@ -2,11 +2,34 @@
 ## Author: Rohit
 ## Date: July, 25, 2017
 # Purpose: Ros node to detect objects using tensorflow
+from __future__ import print_function
+
+import roslib
+import math
+#roslib.load_manifest('my_package')
+import sys
+import rospy
+import cv2
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+from ti_mmwave_rospkg.msg import RadarScan
+from visualization_msgs.msg import MarkerArray,Marker
+from std_msgs.msg import Float32MultiArray
 
 import os
-import sys
-import cv2
 import numpy as np
+clicked_x=50
+clicked_y=50
+fusion=0
+tracked_x=0.0
+tracked_y=0.0
+degree_tracked=0.0
+data_velocity=0.0
+data_range=0.0
+#######################################################################
+#                        DETECTION                                    #
+#######################################################################
 try:
     import tensorflow.compat.v1  as tf
 except ImportError:
@@ -76,6 +99,8 @@ class Detector:
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
+        global fusion
+        global data_velocity, data_range
         objArray = Detection2DArray()
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -126,9 +151,27 @@ class Detector:
         except CvBridgeError as e:
             print(e)
         image_out.header = data.header
+
+        cv2.circle(img, (fusion,300), 5, (0,255,255), -1)
+        color = (128, 0, 0)#navy
+        #color =(255,150,0)#bright blue
+        if data_velocity<0:
+            #cv2.putText(img, f'velocity:{data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            draw_text(img, f'velocity:{data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+        else:
+            #cv2.putText(img, f'velocity:  {data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            draw_text(img, f'velocity:  {data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+        
+        
+
+        #cv2.putText(img,     f'range  :{data_range}m',(10,660),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
+        cv2.imshow("Image window", img)
+        cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
     def object_predict(self,object_data, header, image_np,image):
+        global fusion
         image_height,image_width,channels = image.shape
         obj=Detection2D()
         obj_hypothesis= ObjectHypothesisWithPose()
@@ -136,6 +179,9 @@ class Detector:
         object_id=object_data[0]
         object_score=object_data[1]
         dimensions=object_data[2]
+
+        local_size_x=int((dimensions[3]-dimensions[1] )*image_width)
+        local_center_x=int((dimensions[1] + dimensions [3])*image_height/2)
 
         obj.header=header
         obj_hypothesis.id = object_id
@@ -147,9 +193,50 @@ class Detector:
         obj.bbox.center.y = int((dimensions[0] + dimensions[2])*image_width/2)
 
         return obj
+####################################################################################################
+
+def draw_text(img, text,
+          font=cv2.FONT_HERSHEY_SIMPLEX,
+          pos=(0, 0),
+          font_scale=3,
+          font_thickness=2,
+          text_color=(128, 0, 0),
+          text_color_bg=(0, 0, 0)
+          ):
+
+    x, y = pos
+    text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+    text_w, text_h = text_size
+    cv2.rectangle(img, (x-5,y-5), (x + text_w+10, y + text_h+10), text_color_bg, -1)
+    #cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+    cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+
+    return text_size
+def callback2(data):
+    if(data.point_id==0):
+        global fusion,degree_tracked
+        fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+        
+def marker_array_callback(point):
+    global tracked_x,tracked_y,degree_tracked,data_range
+    tracked_x=point.markers[0].pose.position.x
+    tracked_y=point.markers[0].pose.position.y
+    degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
+    data_range=round(tracked_x,3)
+    
+def velo_range_callback(data):
+    global data_velocity#, data_range
+    print("velocity: ",data.data[0]," range ",data.data[1])
+    data_velocity=round(data.data[0],3)
+    #data_range=round(data.data[1],3)
 
 def main(args):
     rospy.init_node('detector_node')
+
+    rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
+    rospy.Subscriber("/viz",MarkerArray,marker_array_callback)
+    rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
+
     obj=Detector()
     try:
         rospy.spin()

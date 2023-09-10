@@ -39,11 +39,15 @@
 #include <visualization_msgs/MarkerArray.h>
 #include "kf_tracker/point_types.h"
 #include <pcl/point_types.h>
+#include <pcl/filters/passthrough.h>
+#include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/MultiArrayDimension.h>
 using namespace std;
 using namespace cv;
 
 ros::Publisher objID_pub;
 int count_kf;
+float point_speed;
 // KF init
 int stateDim = 4; // [x,y,v_x,v_y]//,w,h]
 int measDim = 2;  // [z_x,z_y,z_w,z_h]
@@ -63,6 +67,7 @@ ros::Publisher pub_cluster4;
 ros::Publisher pub_cluster5;
 
 ros::Publisher markerPub;
+ros::Publisher velo_range_pub;
 
 std::vector<geometry_msgs::Point> prevClusterCenters;
 
@@ -260,7 +265,7 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
 
     clusterMarkers.markers.push_back(m);
 
-    cout<<"Marker"<< i <<" "<<clusterC.x<<" "<<clusterC.y<<" "<<clusterC.z<<"\n";
+    //cout<<"Marker"<< i <<" "<<clusterC.x<<" "<<clusterC.y<<" "<<clusterC.z<<"\n";
   }
 
   prevClusterCenters = clusterCenters;
@@ -393,8 +398,8 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     // [ 0  0  0    1 Ev_y 0 ]
     //// [ 0  0  0    0 1    Ew ]
     //// [ 0  0  0    0 0    Eh ]
-    float sigmaP = 0.01;
-    float sigmaQ = 0.1;
+    float sigmaP = 8e-3;//0.01;
+    float sigmaQ = 0.15;//0.1
     setIdentity(KF0.processNoiseCov, Scalar::all(sigmaP));
     setIdentity(KF1.processNoiseCov, Scalar::all(sigmaP));
     setIdentity(KF2.processNoiseCov, Scalar::all(sigmaP));
@@ -410,6 +415,8 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     cv::setIdentity(KF5.measurementNoiseCov, cv::Scalar(sigmaQ));
 
     // Process the point cloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_cloud (
+        new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud(
@@ -426,7 +433,16 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     //pcl::fromROSMsg(*input, *input_cloud);
     //pcl::fromPCLPointCloud2(pcl_pc2,*input_cloud);
     //pcl_conversions::toPCL(pcl_pc2,*input_cloud);
-    pcl::fromROSMsg(pcl_pc2,*input_cloud);
+    
+    pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
+
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud (unfiltered_cloud);
+    pass.setFilterFieldName ("x");
+    pass.setFilterLimits (0.1, 10.0);
+    //pass.setNegative (true);
+    pass.filter (*input_cloud);
+
     tree->setInputCloud(input_cloud);
 
     std::vector<pcl::PointIndices> cluster_indices;
@@ -553,6 +569,8 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
 
   else {
     // cout<<"ELSE firstFrame="<<firstFrame<<"\n";
+    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_cloud (
+        new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud(
@@ -564,14 +582,20 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     //
     sensor_msgs::PointCloud2 pcl_pc2;
     //pcl_conversions::toPCL not work
+    //pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
+
+    
+    //radar message to pointcloud2
     pcl::toROSMsg(*input,pcl_pc2);
 
-    //pcl::fromROSMsg(*input, *input_cloud);
-    //pcl::fromPCLPointCloud2(pcl_pc2,*input_cloud);
-    //pcl::PointCloud<pcl::PointXYZI> in_cloud;
-    //pcl::fromROSMsg(in_msg, in_cloud);
-    //pcl_conversions::toPCL(pcl_pc2,*input_cloud);
-    pcl::fromROSMsg(pcl_pc2,*input_cloud);
+    //point cloud 2 to pointcloud
+    pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
+
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud (unfiltered_cloud);
+    pass.setFilterFieldName ("x");
+    pass.setFilterLimits (0.3, 10.0);
+    pass.filter (*input_cloud);
 
     tree->setInputCloud(input_cloud);
 
@@ -611,7 +635,12 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     for (it = cluster_indices.begin(); it != cluster_indices.end(); ++it) {
       float x = 0.0;
       float y = 0.0;
+      float velocity_data=0.0;
+      float range_data=0.0,point_range=0.0;
       int numPts = 0;
+      int veloPts=0;
+      int rangePts=0;
+      count_kf++;
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(
           new pcl::PointCloud<pcl::PointXYZ>);
       for (pit = it->indices.begin(); pit != it->indices.end(); pit++) {
@@ -621,12 +650,35 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
         x += input_cloud->points[*pit].x;
         y += input_cloud->points[*pit].y;
         numPts++;
-
+        
+        velocity_data+=(*input).points[*pit].velocity;
+        range_data+=(*input).points[*pit].range;
+        if ((*input).points[*pit].range!=0){rangePts++;}
+        if ((*input).points[*pit].velocity!=0){veloPts++; /*cout<<(*input).points[*pit].velocity<<endl;*/}
+        //cout<<(*input).points[0].x<<"\n";
         // dist_this_point = pcl::geometry::distance(input_cloud->points[*pit],
         //                                          origin);
         // mindist_this_cluster = std::min(dist_this_point,
         // mindist_this_cluster);
       }
+      if(rangePts!=0)point_range=range_data/rangePts;
+      else range_data=0;
+
+      if(veloPts!=0)point_speed=velocity_data/veloPts;
+      else point_speed=0;
+      cout<<"cluster "<<count_kf<<" speed "<<" "<<point_speed<<" range "<<range_data<<endl;
+      count_kf=0;
+      
+      std_msgs::Float32MultiArray velo_range_msg;
+      velo_range_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());  
+      velo_range_msg.layout.dim[0].size = 2;
+      velo_range_msg.layout.dim[0].stride = 1;
+      velo_range_msg.layout.dim[0].label = "debug";
+
+      velo_range_msg.data.push_back(point_speed); 
+      velo_range_msg.data.push_back(point_range); 
+
+      velo_range_pub.publish(velo_range_msg);
 
       pcl::PointXYZ centroid;
       centroid.x = x / numPts;
@@ -637,7 +689,10 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
 
       // Get the centroid of the cluster
       clusterCentroids.push_back(centroid);
+      //count_kf++;
     }
+    //cout<<"cluster points"<<count_kf<<endl;
+    //count_kf=0;
     // cout<<"cluster_vec got some clusters\n";
 
     // Ensure at least 6 clusters exist to publish (later clusters may be empty)
@@ -745,6 +800,7 @@ int main(int argc, char **argv) {
   pub_cluster3 = nh.advertise<sensor_msgs::PointCloud2>("cluster_3", 1);
   pub_cluster4 = nh.advertise<sensor_msgs::PointCloud2>("cluster_4", 1);
   pub_cluster5 = nh.advertise<sensor_msgs::PointCloud2>("cluster_5", 1);
+  velo_range_pub = nh.advertise<std_msgs::Float32MultiArray>("velo_range_array", 1);
   // Subscribe to the clustered pointclouds
   // ros::Subscriber c1=nh.subscribe("ccs",100,KFT);
   objID_pub = nh.advertise<std_msgs::Int32MultiArray>("obj_id", 1);

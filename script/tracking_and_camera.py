@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import print_function
 
 import roslib
@@ -11,10 +11,15 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from ti_mmwave_rospkg.msg import RadarScan
+from visualization_msgs.msg import MarkerArray,Marker
+from std_msgs.msg import Float32MultiArray
+
 clicked_x=50
 clicked_y=50
 fusion=0
-
+tracked_x=0.0
+tracked_y=0.0
+degree_tracked=0.0
 def clear_line(n=4):
     LINE_UP = '\033[1A'
     LINE_CLEAR = '\x1b[2K'
@@ -69,17 +74,20 @@ class image_converter:
 
 def callback2(data):
     if(data.point_id==0):
-        global max_intensity,max_x,max_y,max_z,fusion
+        global max_intensity,max_x,max_y,max_z,fusion,degree_tracked
+        '''
         print("max ",max_intensity),
         print(" x ",max_x),
         print(" y ",max_y),
         print(" z ",max_z),
+        '''
         if(max_x>0):
            degree=math.degrees(math.atan(max_y/max_x))
         else:
            degree=0
-        fusion=round(640-(degree*14.5+pow(degree,3)*0.0045))
-        print(" fusion ",round(fusion)),
+        #fusion=round(640-(degree*14.5+pow(degree,3)*0.0045))
+        fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+        #print(" fusion ",round(fusion)),
         max_intensity=0
         #clear_line(5)
 
@@ -88,12 +96,27 @@ def callback2(data):
         max_x=data.x
         max_y=data.y
         max_z=data.z
-
+def marker_array_callback(point):
+    global tracked_x,tracked_y,degree_tracked
+    tracked_x=point.markers[0].pose.position.x
+    tracked_y=point.markers[0].pose.position.y
+    degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
+    #print ("x ",point.markers[0].pose.position.x," y ",point.markers[0].pose.position.y)
+    #for marker in point.markers:
+    #    print("maker "," x ",marker.pose.position.x)
+    
+    #clear_line(6)
+def velo_range_callback(data):
+   print("velocity: ",data.data[0]," range ",data.data[1])
 def main(args):
   ic = image_converter()
   rospy.init_node('image_converter', anonymous=True)
   rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
+  rospy.Subscriber("/viz",MarkerArray,marker_array_callback)
+  rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
   #cv2.setMouseCallback('Image window', click_event)
+  
+  #self.marker_array_pub = rospy.Publisher('/movo/waypoints',MarkerArray,queue_size=10)
   try:
     rospy.spin()
   except KeyboardInterrupt:

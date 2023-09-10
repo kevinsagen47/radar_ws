@@ -126,6 +126,8 @@ class Detector:
         except CvBridgeError as e:
             print(e)
         image_out.header = data.header
+        cv2.imshow("Image window", img)
+        cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
     def object_predict(self,object_data, header, image_np,image):
