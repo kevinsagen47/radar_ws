@@ -7,6 +7,9 @@ import os
 import sys
 import cv2
 import numpy as np
+from motrackers import CentroidTracker, CentroidKF_Tracker, SORT, IOUTracker
+from motrackers.utils import draw_tracks
+
 try:
     import tensorflow.compat.v1  as tf
 except ImportError:
@@ -73,6 +76,7 @@ class Detector:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_cb, queue_size=1, buff_size=2**24)
         self.sess = tf.Session(graph=detection_graph,config=config)
+        self.tracker = CentroidTracker(max_lost=0, tracker_output_format='mot_challenge')
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
@@ -99,8 +103,9 @@ class Detector:
 
         (boxes, scores, classes, num_detections) = self.sess.run([boxes, scores, classes, num_detections],
             feed_dict={image_tensor: image_np_expanded})
-        if(len(boxes)>0):
-            print(np.squeeze(boxes))
+        #print (boxes[0][0:3])
+        
+        #'''
         objects=vis_util.visualize_boxes_and_labels_on_image_array(
             image,
             np.squeeze(boxes),
@@ -108,31 +113,66 @@ class Detector:
             np.squeeze(scores),
             category_index,
             use_normalized_coordinates=True,
-            line_thickness=2)
-
+            line_thickness=5)
+        #'''
+        #'''
         objArray.detections =[]
         objArray.header=data.header
         object_count=1
-
         for i in range(len(objects)):
             object_count+=1
             objArray.detections.append(self.object_predict(objects[i],data.header,image_np,cv_image))
-
         self.object_pub.publish(objArray)
 
+        bboxes, confidences, class_ids = [], [], []
+        for i in range(len(objects)):
+            bboxes.append([objArray.detections[i].bbox.center.y, objArray.detections[i].bbox.center.x, 
+                        objArray.detections[i].bbox.size_x, objArray.detections[i].bbox.size_y])
+            confidences.append(scores[0][i])
+            #print ()
+            class_ids.append(int(classes[0][i]))
+        tracks = self.tracker.update(np.array(bboxes).astype('int'), np.array(class_ids).astype('int'), np.array(confidences))
+        #'''
+        '''
+        #print(objArray.detections[0].bbox.center.x)
+        print(np.array(bboxes).astype('int'))
+        print(np.array(confidences))
+        print(np.array(class_ids).astype('int'))
+        #np.array(bboxes)[indices, :].astype('int')
+        '''
+        
+        #print(tracks)
+        
+        #print(objArray.detections[0])
+        #image_np=draw_tracks(image_np, tracks)
         img=cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+        #img=draw_tracks(img, tracks)
+
+        #blank_image = np.zeros((640,1280,3), np.uint8)
+        #img=draw_tracks(blank_image, tracks)
+
         image_out = Image()
         try:
             image_out = self.bridge.cv2_to_imgmsg(img,"bgr8")
         except CvBridgeError as e:
             print(e)
         image_out.header = data.header
+        #'''
+        if(len(objects)>0):
+            cv2.circle(img, (objArray.detections[0].bbox.center.x,objArray.detections[0].bbox.center.y), 5, (0,255,255), -1)
+            print(confidences[0])
+        #'''
+        #print(img.shape)
         cv2.imshow("Image window", img)
         cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
     def object_predict(self,object_data, header, image_np,image):
         image_height,image_width,channels = image.shape
+        #image_height=640
+        #image_width=1280
+        #print(image_height)
+        #print(image_width)
         obj=Detection2D()
         obj_hypothesis= ObjectHypothesisWithPose()
 
@@ -144,11 +184,31 @@ class Detector:
         obj_hypothesis.id = object_id
         obj_hypothesis.score = object_score
         obj.results.append(obj_hypothesis)
+        '''
+        xmid, ymid, w, h = dimensions[0:4] * np.array([image_width, image_height, image_width, image_height])
+        x, y = int(xmid - 0.5*w), int(ymid - 0.5*h)
+        obj.bbox.size_y = h
+        obj.bbox.size_x = w
+        obj.bbox.center.x = x
+        obj.bbox.center.y = y
+        print("[",x,",",y,"]")
+        
+        xmid, ymid, w, h = detect[0:4] * np.array([self.width, self.height, self.width, self.height])
+        x, y = int(xmid - 0.5*w), int(ymid - 0.5*h)
+        bboxes.append([x, y, w, h])
+        confidences.append(float(confidence))
+        class_ids.append(class_id)
+        '''
+        xmid, ymid, w, h = dimensions[0:4] * np.array([image_width, image_height, image_width, image_height])
+
         obj.bbox.size_y = int((dimensions[2]-dimensions[0])*image_height)
         obj.bbox.size_x = int((dimensions[3]-dimensions[1] )*image_width)
-        obj.bbox.center.x = int((dimensions[1] + dimensions [3])*image_height/2)
-        obj.bbox.center.y = int((dimensions[0] + dimensions[2])*image_width/2)
-
+        obj.bbox.center.x = int(((dimensions[1] + dimensions [3])*image_width)/2)
+        obj.bbox.center.y = int(((dimensions[0] + dimensions[2])*image_height)/2)
+        #print("[",obj.bbox.center.x,",",obj.bbox.center.y,"]",object_score)
+        print(dimensions)
+        #'''
+        #bboxes.append([x, y, w, h])
         return obj
 
 def main(args):
