@@ -2,14 +2,37 @@
 ## Author: Rohit
 ## Date: July, 25, 2017
 # Purpose: Ros node to detect objects using tensorflow
+from __future__ import print_function
 
-import os
+import roslib
+import math
+#roslib.load_manifest('my_package')
 import sys
+import rospy
 import cv2
-import numpy as np
 from motrackers import CentroidTracker, CentroidKF_Tracker, SORT, IOUTracker
 from motrackers.utils import draw_tracks
 
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+from ti_mmwave_rospkg.msg import RadarScan
+from visualization_msgs.msg import MarkerArray,Marker
+from std_msgs.msg import Float32MultiArray
+
+import os
+import numpy as np
+clicked_x=50
+clicked_y=50
+fusion=0
+tracked_x=0.0
+tracked_y=0.0
+degree_tracked=0.0
+data_velocity=0.0
+data_range=0.0
+#######################################################################
+#                        DETECTION                                    #
+#######################################################################
 try:
     import tensorflow.compat.v1  as tf
 except ImportError:
@@ -80,6 +103,8 @@ class Detector:
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
+        global fusion
+        global data_velocity, data_range
         objArray = Detection2DArray()
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -103,9 +128,7 @@ class Detector:
 
         (boxes, scores, classes, num_detections) = self.sess.run([boxes, scores, classes, num_detections],
             feed_dict={image_tensor: image_np_expanded})
-        #print (boxes[0][0:3])
-        
-        #'''
+
         objects=vis_util.visualize_boxes_and_labels_on_image_array(
             image,
             np.squeeze(boxes),
@@ -113,15 +136,16 @@ class Detector:
             np.squeeze(scores),
             category_index,
             use_normalized_coordinates=True,
-            line_thickness=5)
-        #'''
-        #'''
+            line_thickness=2)
+
         objArray.detections =[]
         objArray.header=data.header
         object_count=1
+
         for i in range(len(objects)):
             object_count+=1
             objArray.detections.append(self.object_predict(objects[i],data.header,image_np,cv_image))
+
         self.object_pub.publish(objArray)
 
         bboxes, confidences, class_ids = [], [], []
@@ -133,23 +157,9 @@ class Detector:
             class_ids.append(int(classes[0][i]))
         tracks = self.tracker.update(np.array(bboxes).astype('int'), np.array(class_ids).astype('int'), np.array(confidences))
         #'''
-        '''
-        #print(objArray.detections[0].bbox.center.x)
-        print(np.array(bboxes).astype('int'))
-        print(np.array(confidences))
-        print(np.array(class_ids).astype('int'))
-        #np.array(bboxes)[indices, :].astype('int')
-        '''
-        
-        print(tracks)
-        
-        #print(objArray.detections[0])
-        #image_np=draw_tracks(image_np, tracks)
+
         img=cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
         img=draw_tracks(img, tracks)
-
-        #blank_image = np.zeros((640,1280,3), np.uint8)
-        #img=draw_tracks(blank_image, tracks)
 
         image_out = Image()
         try:
@@ -157,23 +167,29 @@ class Detector:
         except CvBridgeError as e:
             print(e)
         image_out.header = data.header
-        '''
-        if(len(objects)>0):
-            cv2.circle(img, (objArray.detections[0].bbox.center.x,objArray.detections[0].bbox.center.y), 5, (0,255,255), -1)
-            #print(confidences[0])
-        '''
+
         cv2.circle(img, (fusion,300), 5, (0,255,255), -1)
-        #print(img.shape)
+        color = (128, 0, 0)#navy
+        #color =(255,150,0)#bright blue
+        '''
+        if data_velocity<0:
+            #cv2.putText(img, f'velocity:{data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            draw_text(img, f'velocity:{data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+        else:
+            #cv2.putText(img, f'velocity:  {data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            draw_text(img, f'velocity:  {data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+        '''
+        
+
+        #cv2.putText(img,     f'range  :{data_range}m',(10,660),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        #draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
         cv2.imshow("Image window", img)
         cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
     def object_predict(self,object_data, header, image_np,image):
+        global fusion
         image_height,image_width,channels = image.shape
-        #image_height=640
-        #image_width=1280
-        #print(image_height)
-        #print(image_width)
         obj=Detection2D()
         obj_hypothesis= ObjectHypothesisWithPose()
 
@@ -181,40 +197,65 @@ class Detector:
         object_score=object_data[1]
         dimensions=object_data[2]
 
+        local_size_x=int((dimensions[3]-dimensions[1] )*image_width)
+        local_center_x=int((dimensions[1] + dimensions [3])*image_height/2)
+
         obj.header=header
         obj_hypothesis.id = object_id
         obj_hypothesis.score = object_score
         obj.results.append(obj_hypothesis)
-        '''
-        xmid, ymid, w, h = dimensions[0:4] * np.array([image_width, image_height, image_width, image_height])
-        x, y = int(xmid - 0.5*w), int(ymid - 0.5*h)
-        obj.bbox.size_y = h
-        obj.bbox.size_x = w
-        obj.bbox.center.x = x
-        obj.bbox.center.y = y
-        print("[",x,",",y,"]")
-        
-        xmid, ymid, w, h = detect[0:4] * np.array([self.width, self.height, self.width, self.height])
-        x, y = int(xmid - 0.5*w), int(ymid - 0.5*h)
-        bboxes.append([x, y, w, h])
-        confidences.append(float(confidence))
-        class_ids.append(class_id)
-        '''
-        xmid, ymid, w, h = dimensions[0:4] * np.array([image_width, image_height, image_width, image_height])
-
         obj.bbox.size_y   = int((dimensions[2]-dimensions[0])*image_height)
         obj.bbox.size_x   = int((dimensions[3]-dimensions[1] )*image_width)
         obj.bbox.center.x = int(((dimensions[1] + dimensions [3])*image_width)/2)
         obj.bbox.center.y = int(((dimensions[0] + dimensions[2])*image_height)/2)
-        #print("[",obj.bbox.center.x,",",obj.bbox.center.y,"]",object_score)
-        #print("[",obj.bbox.size_x,",",obj.bbox.size_y,"]",object_score)
-        #print(dimensions)
-        #'''
-        #bboxes.append([x, y, w, h])
+        
         return obj
+####################################################################################################
+
+def draw_text(img, text,
+          font=cv2.FONT_HERSHEY_SIMPLEX,
+          pos=(0, 0),
+          font_scale=3,
+          font_thickness=2,
+          text_color=(128, 0, 0),
+          text_color_bg=(0, 0, 0)
+          ):
+
+    x, y = pos
+    text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+    text_w, text_h = text_size
+    cv2.rectangle(img, (x-5,y-5), (x + text_w+10, y + text_h+10), text_color_bg, -1)
+    #cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+    cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+
+    return text_size
+'''
+def callback2(data):
+    if(data.point_id==0):
+        global fusion,degree_tracked
+        fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+'''     
+def marker_array_callback(point):
+    global tracked_x,tracked_y,degree_tracked,data_range,fusion
+    tracked_x=point.markers[0].pose.position.x
+    tracked_y=point.markers[0].pose.position.y
+    degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
+    fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+    data_range=round(tracked_x,3)
+    
+def velo_range_callback(data):
+    global data_velocity#, data_range
+    print("velocity: ",data.data[0]," range ",data.data[1])
+    data_velocity=round(data.data[0],3)
+    #data_range=round(data.data[1],3)
 
 def main(args):
     rospy.init_node('detector_node')
+
+    #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
+    rospy.Subscriber("/viz",MarkerArray,marker_array_callback)
+    rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
+
     obj=Detector()
     try:
         rospy.spin()
