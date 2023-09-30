@@ -12,8 +12,10 @@ if __name__ == '__main__' :
                 [0.9013402462*500,640+0.3299419582*500, 1],
                 [0.9823723435*500,640+0.5671729445*500,1]])
     pts_src=np.around(pts_src,0)
-    print(pts_src)
+    print("src",pts_src)
     pts_dst = np.array([[1103, 265, 1], [875, 282,1], [583, 291,1],[339, 303,1],[124,316,1]])
+    print("dst",pts_dst )
+    '''
     print("Process Noise Covariance Matrix Q")
     kf=np.array([["Ex",0,0,0,0,0],
                 [0,"Ey",0,0,0,0],
@@ -22,16 +24,18 @@ if __name__ == '__main__' :
                 [0,0,0,0,1,"Ew"],
                 [0,0,0,0,0,"Eh"]])
     print(kf)
+    '''
     #pts_src = np.array([[141, 131,1], [480, 159,1], [493, 630,1],[64, 601,1]])
     #pts_dst = np.array([[318, 256],[534, 372],[316, 670],[73, 473]])
 
     # Calculate Homography
     #h, status = cv2.findHomography(pts_dst,pts_src)
     h, status = cv2.findHomography(pts_src, pts_dst)
-    print(h)
-    print (pts_src[0])
-    hasil=h@pts_src[0]
-    print(hasil)
+    print("homography matrix",h)
+    #print (pts_src[0])
+    result=h@pts_src[0]
+    print ("result must be",pts_dst[0])
+    print("but result is ",result)
     '''
     # Warp source image to destination based on homography
     im_out = cv2.warpPerspective(im_src, h, (im_dst.shape[1],im_dst.shape[0]))

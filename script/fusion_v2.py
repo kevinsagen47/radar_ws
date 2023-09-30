@@ -25,6 +25,7 @@ import numpy as np
 clicked_x=50
 clicked_y=50
 fusion=0
+locked =0
 tracked_x=0.0
 tracked_y=0.0
 degree_tracked=0.0
@@ -103,7 +104,7 @@ class Detector:
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
-        global fusion
+        global fusion,locked,locked_with
         global data_velocity, data_range
         objArray = Detection2DArray()
         try:
@@ -150,17 +151,66 @@ class Detector:
 
         bboxes, confidences, class_ids = [], [], []
         for i in range(len(objects)):
-            bboxes.append([objArray.detections[i].bbox.center.x, objArray.detections[i].bbox.center.y, 0,0])
-            #            objArray.detections[i].bbox.size_x, objArray.detections[i].bbox.size_y])
+            bboxes.append([(objArray.detections[i].bbox.center.x-(objArray.detections[i].bbox.size_x/2)), 
+                          (objArray.detections[i].bbox.center.y-(objArray.detections[i].bbox.size_y/2)), #0,0]))
+                        objArray.detections[i].bbox.size_x, objArray.detections[i].bbox.size_y])
             confidences.append(scores[0][i])
             #print ()
             class_ids.append(int(classes[0][i]))
+        #print (bboxes)
         tracks = self.tracker.update(np.array(bboxes).astype('int'), np.array(class_ids).astype('int'), np.array(confidences))
         #'''
 
         img=cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
         img=draw_tracks(img, tracks)
 
+
+        #states 
+        #0 not locked
+        #1 locked
+
+
+        '''
+        if(len(tracks)>0):
+            tracked_image=np.array(tracks).astype('int')
+            #print(tracked_image[0][1:6])
+            x_min=tracked_image[0][2]
+            x_max=tracked_image[0][2]+tracked_image[0][4]
+            print("min ",x_min," x_max ",x_max)
+            print (fusion)
+        '''
+        current_frame_found=0
+        tracked_image=np.array(tracks).astype('int')
+        if(locked==0):
+            for i in range(len(tracked_image)):
+                x_min=tracked_image[i][2]
+                x_max=tracked_image[i][2]+tracked_image[0][4]
+                if(x_min<fusion and x_max>fusion):
+                    print("fusion locked with ID",tracked_image[i][1])
+                    locked=1
+                    locked_with=tracked_image[i][1]
+            if(locked==0 and 'locked_with' in locals()):
+                for i in range(len(tracked_image)):
+                    if(tracked_image[i][1]==locked_with):
+                        current_frame_found=1
+                        locked=1
+                        print("USING PREVIOUS LOCKED INFORMARTION<<<<<<<<<<<<<<<<<<<")
+                print("GONSKIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII")
+
+        
+        if(locked==1):
+            for i in range(len(tracked_image)):
+                if(tracked_image[i][1]==locked_with):
+                    current_frame_found=1
+                    current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
+                    current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
+        
+        if(current_frame_found==0):
+            locked=0
+            print("depending on radar")
+        else:
+            print("fusion locked with ID",locked_with," error ",current_ground_truth_x-fusion)
+        
         image_out = Image()
         try:
             image_out = self.bridge.cv2_to_imgmsg(img,"bgr8")
@@ -245,7 +295,7 @@ def marker_array_callback(point):
     
 def velo_range_callback(data):
     global data_velocity#, data_range
-    print("velocity: ",data.data[0]," range ",data.data[1])
+    #print("velocity: ",data.data[0]," range ",data.data[1])
     data_velocity=round(data.data[0],3)
     #data_range=round(data.data[1],3)
 

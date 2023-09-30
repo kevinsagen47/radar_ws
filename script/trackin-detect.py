@@ -157,12 +157,11 @@ class Detector:
         except CvBridgeError as e:
             print(e)
         image_out.header = data.header
-        '''
+        #'''
         if(len(objects)>0):
             cv2.circle(img, (objArray.detections[0].bbox.center.x,objArray.detections[0].bbox.center.y), 5, (0,255,255), -1)
             #print(confidences[0])
-        '''
-        cv2.circle(img, (fusion,300), 5, (0,255,255), -1)
+        #'''
         #print(img.shape)
         cv2.imshow("Image window", img)
         cv2.waitKey(3)
