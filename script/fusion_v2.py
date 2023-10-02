@@ -19,12 +19,13 @@ from cv_bridge import CvBridge, CvBridgeError
 from ti_mmwave_rospkg.msg import RadarScan
 from visualization_msgs.msg import MarkerArray,Marker
 from std_msgs.msg import Float32MultiArray
+import time
 
 import os
 import numpy as np
 clicked_x=50
 clicked_y=50
-fusion=0
+radar_to_x=0
 locked =0
 tracked_x=0.0
 tracked_y=0.0
@@ -104,7 +105,7 @@ class Detector:
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
-        global fusion,locked,locked_with
+        global radar_to_x,locked,locked_with,tracked_y,radar_to_y
         global data_velocity, data_range
         objArray = Detection2DArray()
         try:
@@ -177,7 +178,7 @@ class Detector:
             x_min=tracked_image[0][2]
             x_max=tracked_image[0][2]+tracked_image[0][4]
             print("min ",x_min," x_max ",x_max)
-            print (fusion)
+            print (radar_to_x)
         '''
         current_frame_found=0
         tracked_image=np.array(tracks).astype('int')
@@ -185,8 +186,8 @@ class Detector:
             for i in range(len(tracked_image)):
                 x_min=tracked_image[i][2]
                 x_max=tracked_image[i][2]+tracked_image[0][4]
-                if(x_min<fusion and x_max>fusion):
-                    print("fusion locked with ID",tracked_image[i][1])
+                if(x_min<radar_to_x and x_max>radar_to_x):
+                    #print("radar_to_x locked with ID",tracked_image[i][1])
                     locked=1
                     locked_with=tracked_image[i][1]
             if(locked==0 and 'locked_with' in locals()):
@@ -204,12 +205,17 @@ class Detector:
                     current_frame_found=1
                     current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
                     current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
+                    x_min_cali=tracked_image[i][2]
+                    x_max_cali=tracked_image[i][2]+tracked_image[0][4]
+                    if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<500):
+                        print(current_ground_truth_y," ",tracked_x)
+
         
         if(current_frame_found==0):
             locked=0
-            print("depending on radar")
-        else:
-            print("fusion locked with ID",locked_with," error ",current_ground_truth_x-fusion)
+            #print("depending on radar")
+        #else:
+        #    print("radar_to_x locked with ID",locked_with," error ",current_ground_truth_x-radar_to_x)
         
         image_out = Image()
         try:
@@ -218,7 +224,7 @@ class Detector:
             print(e)
         image_out.header = data.header
 
-        cv2.circle(img, (fusion,300), 5, (0,255,255), -1)
+        cv2.circle(img, (radar_to_x,radar_to_y), 5, (0,255,255), -1)
         color = (128, 0, 0)#navy
         #color =(255,150,0)#bright blue
         '''
@@ -238,7 +244,7 @@ class Detector:
         self.image_pub.publish(image_out)
 
     def object_predict(self,object_data, header, image_np,image):
-        global fusion
+        global radar_to_x
         image_height,image_width,channels = image.shape
         obj=Detection2D()
         obj_hypothesis= ObjectHypothesisWithPose()
@@ -282,15 +288,17 @@ def draw_text(img, text,
 '''
 def callback2(data):
     if(data.point_id==0):
-        global fusion,degree_tracked
-        fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+        global radar_to_x,degree_tracked
+        radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
 '''     
 def marker_array_callback(point):
-    global tracked_x,tracked_y,degree_tracked,data_range,fusion
+    global tracked_x,tracked_y,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y
     tracked_x=point.markers[0].pose.position.x
     tracked_y=point.markers[0].pose.position.y
+    last_radar=time.time()
     degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
-    fusion=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+    radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+    radar_to_y=round(50*tracked_x+350)
     data_range=round(tracked_x,3)
     
 def velo_range_callback(data):
