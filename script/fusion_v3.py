@@ -32,6 +32,13 @@ tracked_y=0.0
 degree_tracked=0.0
 data_velocity=0.0
 data_range=0.0
+last_radar=0
+prev_tracked_x=0
+prev_tracked_y=0
+prev_radar_to_x=0
+last_update=0
+Vx=0
+Vy=0
 #######################################################################
 #                        DETECTION                                    #
 #######################################################################
@@ -294,15 +301,34 @@ def callback2(data):
         radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
 '''     
 def marker_array_callback(point):
-    global tracked_x,tracked_y,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y
-    tracked_x=point.markers[0].pose.position.x
-    tracked_y=point.markers[0].pose.position.y
-    last_radar=time.time()
-    degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
-    radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-    radar_to_y=round(50*tracked_x+350)
-    data_range=round(tracked_x,3)
+    global tracked_x,tracked_y,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_x,prev_tracked_y,prev_radar_to_x,last_update,Vx,Vy
     
+    tracked_x=round(point.markers[0].pose.position.x,3)
+    tracked_y=round(point.markers[0].pose.position.y,3)
+    #print("prev",prev_tracked_y,"prev_tracked_y!=tracked_y",tracked_y,"t/f",(prev_tracked_y!=tracked_y))
+    if(prev_tracked_y!=tracked_y or prev_tracked_x!=tracked_x):
+        degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
+        radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+        radar_to_y=round(50*tracked_x+350)
+        data_range=round(tracked_x,3)
+
+        last_radar_delta=time.time()-last_radar
+        Vy=(tracked_x-prev_tracked_x)/last_radar_delta#range in meters
+        Vx=(radar_to_x-prev_radar_to_x)/last_radar_delta#azimuth but in pixel
+        #print("Vx ",Vx," Vy ",Vy, "delta time",last_radar_delta)
+        #print((radar_to_x-prev_radar_to_x))
+        #print("Vx ",Vx)
+        prev_radar_to_x=radar_to_x
+        prev_tracked_x=tracked_x
+        prev_tracked_y=tracked_y
+        last_radar=time.time()
+        last_update=time.time()
+    else:#update
+        predict_add=Vx*(time.time()-last_update)
+        print("predict add",predict_add," Vx ",Vx," time ",time.time())
+        radar_to_x=round(radar_to_x+0.2*Vx*(time.time()-last_update))
+        last_update=time.time()
+
 def velo_range_callback(data):
     global data_velocity#, data_range
     #print("velocity: ",data.data[0]," range ",data.data[1])
