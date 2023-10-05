@@ -20,6 +20,9 @@ from ti_mmwave_rospkg.msg import RadarScan
 from visualization_msgs.msg import MarkerArray,Marker
 from std_msgs.msg import Float32MultiArray
 import time
+from geometry_msgs.msg import PoseStamped
+
+import tf as transferfunction
 
 import os
 import numpy as np
@@ -38,6 +41,7 @@ prev_tracked_y=0
 prev_radar_to_x=0
 last_update=0
 Vx=0
+Vx_m=0
 Vy=0
 #######################################################################
 #                        DETECTION                                    #
@@ -105,6 +109,7 @@ class Detector:
     def __init__(self):
         self.image_pub = rospy.Publisher("debug_image",Image, queue_size=1)
         self.object_pub = rospy.Publisher("objects", Detection2DArray, queue_size=1)
+        self.pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_cb, queue_size=1, buff_size=2**24)
         self.sess = tf.Session(graph=detection_graph,config=config)
@@ -248,7 +253,7 @@ class Detector:
 
         #cv2.putText(img,     f'range  :{data_range}m',(10,660),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
         #draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
-        cv2.imshow("Image window", img)
+        #cv2.imshow("Image window", img)
         cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
@@ -302,7 +307,7 @@ def callback2(data):
 '''     
 def marker_array_callback(point):
     global tracked_x,tracked_y,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_x,prev_tracked_y,prev_radar_to_x,last_update,Vx,Vy
-    
+    global obj,Vx_m
     tracked_x=round(point.markers[0].pose.position.x,3)
     tracked_y=round(point.markers[0].pose.position.y,3)
     #print("prev",prev_tracked_y,"prev_tracked_y!=tracked_y",tracked_y,"t/f",(prev_tracked_y!=tracked_y))
@@ -314,6 +319,7 @@ def marker_array_callback(point):
 
         last_radar_delta=time.time()-last_radar
         Vy=(tracked_x-prev_tracked_x)/last_radar_delta#range in meters
+        Vx_m=(tracked_y-prev_tracked_y)/last_radar_delta#azimuth in meters
         Vx=(radar_to_x-prev_radar_to_x)/last_radar_delta#azimuth but in pixel
         #print("Vx ",Vx," Vy ",Vy, "delta time",last_radar_delta)
         #print((radar_to_x-prev_radar_to_x))
@@ -321,13 +327,67 @@ def marker_array_callback(point):
         prev_radar_to_x=radar_to_x
         prev_tracked_x=tracked_x
         prev_tracked_y=tracked_y
+        tracked_x_predict=tracked_x
+        tracked_y_predict=tracked_y
         last_radar=time.time()
         last_update=time.time()
     else:#update
         predict_add=Vx*(time.time()-last_update)
-        print("predict add",predict_add," Vx ",Vx," time ",time.time())
-        radar_to_x=round(radar_to_x+0.2*Vx*(time.time()-last_update))
+        #print("predict add",predict_add," Vx ",Vx," time ",time.time())
+        radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
+        tracked_x_predict=tracked_x_predict+0.1*Vy*(time.time()-last_update)
+        tracked_y_predict=tracked_y_predict+0.1*Vx_m*(time.time()-last_update)
         last_update=time.time()
+    print(Vx_m," ",Vy)
+    p = PoseStamped()
+    p.header.frame_id="ti_mmwave"
+    p.pose.position.x = tracked_x_predict
+    p.pose.position.y = tracked_y_predict
+    p.pose.position.z = 0.0
+
+    if(Vx_m<0):
+        yaw=90-math.degrees(math.atan(Vy/-0.1*Vx_m))
+    else:
+        yaw=270-math.degrees(math.atan(Vy/-0.1*Vx_m))
+    yaw=math.radians(-1*yaw)
+    #yaw=5.49779
+    pitch=0.0
+    roll=0.0
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    z=sy * cp * cr - cy * sp * sr
+    w=cy * cp * cr + sy * sp * sr
+
+    p.pose.orientation.y = 0.0#vy/norm
+    p.pose.orientation.x = 0.0#vx/norm
+    p.pose.orientation.z = z
+    p.pose.orientation.w = w
+    
+    #real 45 prog 315
+    #z  0.4871745124605095
+    #w  -0.8733046400935156
+
+    #real 135 prog 180
+    #z  0.8939966636005579
+    #w  -0.4480736161291701
+
+    #real 225 prog 90
+    #z 0.8509035245341184
+    #w 0.5253219888177297
+
+    #real 315 prog 45
+    #z  -0.4871745124605095
+    #w  -0.8733046400935156
+
+    
+
+    obj.pose_pub.publish(p)
+    #self.image_pub.publish(image_out)
+    
 
 def velo_range_callback(data):
     global data_velocity#, data_range
@@ -336,6 +396,7 @@ def velo_range_callback(data):
     #data_range=round(data.data[1],3)
 
 def main(args):
+    global obj
     rospy.init_node('detector_node')
 
     #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
