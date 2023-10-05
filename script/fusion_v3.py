@@ -30,14 +30,14 @@ clicked_x=50
 clicked_y=50
 radar_to_x=0
 locked =0
-tracked_x=0.0
-tracked_y=0.0
+tracked_range=0.0
+tracked_azimuth=0.0
 degree_tracked=0.0
 data_velocity=0.0
 data_range=0.0
 last_radar=0
-prev_tracked_x=0
-prev_tracked_y=0
+prev_tracked_range=0
+prev_tracked_azimuth=0
 prev_radar_to_x=0
 last_update=0
 Vx=0
@@ -117,7 +117,7 @@ class Detector:
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
-        global radar_to_x,locked,locked_with,tracked_y,radar_to_y
+        global radar_to_x,locked,locked_with,tracked_azimuth,radar_to_y
         global data_velocity, data_range
         objArray = Detection2DArray()
         try:
@@ -221,7 +221,7 @@ class Detector:
                     x_min_cali=tracked_image[i][2]
                     x_max_cali=tracked_image[i][2]+tracked_image[0][4]
                     if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<500):
-                        print(current_ground_truth_y," ",tracked_x)
+                        print(current_ground_truth_y," ",tracked_range)
                     '''
 
         
@@ -306,43 +306,43 @@ def callback2(data):
         radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
 '''     
 def marker_array_callback(point):
-    global tracked_x,tracked_y,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_x,prev_tracked_y,prev_radar_to_x,last_update,Vx,Vy
+    global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
     global obj,Vx_m
-    tracked_x=round(point.markers[0].pose.position.x,3)
-    tracked_y=round(point.markers[0].pose.position.y,3)
-    #print("prev",prev_tracked_y,"prev_tracked_y!=tracked_y",tracked_y,"t/f",(prev_tracked_y!=tracked_y))
-    if(prev_tracked_y!=tracked_y or prev_tracked_x!=tracked_x):
-        degree_tracked=math.degrees(math.atan(tracked_y/tracked_x))
+    tracked_range=round(point.markers[0].pose.position.x,3)
+    tracked_azimuth=round(point.markers[0].pose.position.y,3)
+    #print("prev",prev_tracked_azimuth,"prev_tracked_azimuth!=tracked_azimuth",tracked_azimuth,"t/f",(prev_tracked_azimuth!=tracked_azimuth))
+    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):
+        degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
         radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-        radar_to_y=round(50*tracked_x+350)
-        data_range=round(tracked_x,3)
+        radar_to_y=round(50*tracked_range+350)
+        data_range=round(tracked_range,3)
 
         last_radar_delta=time.time()-last_radar
-        Vy=(tracked_x-prev_tracked_x)/last_radar_delta#range in meters
-        Vx_m=(tracked_y-prev_tracked_y)/last_radar_delta#azimuth in meters
+        Vy=(tracked_range-prev_tracked_range)/last_radar_delta#range in meters
+        Vx_m=(tracked_azimuth-prev_tracked_azimuth)/last_radar_delta#azimuth in meters
         Vx=(radar_to_x-prev_radar_to_x)/last_radar_delta#azimuth but in pixel
         #print("Vx ",Vx," Vy ",Vy, "delta time",last_radar_delta)
         #print((radar_to_x-prev_radar_to_x))
         #print("Vx ",Vx)
         prev_radar_to_x=radar_to_x
-        prev_tracked_x=tracked_x
-        prev_tracked_y=tracked_y
-        tracked_x_predict=tracked_x
-        tracked_y_predict=tracked_y
+        prev_tracked_range=tracked_range
+        prev_tracked_azimuth=tracked_azimuth
+        tracked_range_predict=tracked_range
+        tracked_azimuth_predict=tracked_azimuth
         last_radar=time.time()
         last_update=time.time()
     else:#update
         predict_add=Vx*(time.time()-last_update)
         #print("predict add",predict_add," Vx ",Vx," time ",time.time())
         radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
-        tracked_x_predict=tracked_x_predict+0.1*Vy*(time.time()-last_update)
-        tracked_y_predict=tracked_y_predict+0.1*Vx_m*(time.time()-last_update)
+        tracked_range_predict=tracked_range_predict+0.1*Vy*(time.time()-last_update)
+        tracked_azimuth_predict=tracked_azimuth_predict+0.1*Vx_m*(time.time()-last_update)
         last_update=time.time()
     print(Vx_m," ",Vy)
     p = PoseStamped()
     p.header.frame_id="ti_mmwave"
-    p.pose.position.x = tracked_x_predict
-    p.pose.position.y = tracked_y_predict
+    p.pose.position.x = tracked_range_predict
+    p.pose.position.y = tracked_azimuth_predict
     p.pose.position.z = 0.0
 
     if(Vx_m<0):
