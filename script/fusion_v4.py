@@ -3,7 +3,12 @@
 ## Date: July, 25, 2017
 # Purpose: Ros node to detect objects using tensorflow
 from __future__ import print_function
-
+# ROS related imports
+import rospy
+from std_msgs.msg import String , Header
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 import roslib
 import math
 #roslib.load_manifest('my_package')
@@ -23,7 +28,7 @@ import time
 from geometry_msgs.msg import PoseStamped
 
 import tf as transferfunction
-
+import threading
 import os
 import numpy as np
 clicked_x=50
@@ -43,9 +48,11 @@ last_update=0
 Vx=0
 Vx_m=0
 Vy=0
+kf_timer=0
 #######################################################################
 #                        DETECTION                                    #
 #######################################################################
+'''
 try:
     import tensorflow.compat.v1  as tf
 except ImportError:
@@ -54,12 +61,7 @@ except ImportError:
     print("  sudo pip install tensorflow")
     sys.exit(1)
 
-# ROS related imports
-import rospy
-from std_msgs.msg import String , Header
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
-from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
+
 
 # Object detection module imports
 import object_detection
@@ -101,7 +103,7 @@ category_index = label_map_util.create_category_index(categories)
 # Setting the GPU options to use fraction of gpu that has been set
 config = tf.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = GPU_FRACTION
-
+'''
 # Detection
 
 class Detector:
@@ -109,7 +111,7 @@ class Detector:
     def __init__(self):
         self.image_pub = rospy.Publisher("debug_image",Image, queue_size=1)
         self.object_pub = rospy.Publisher("objects", Detection2DArray, queue_size=1)
-        self.pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
+        #self.pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_cb, queue_size=1, buff_size=2**24)
         self.sess = tf.Session(graph=detection_graph,config=config)
@@ -244,16 +246,18 @@ class Detector:
         '''
         if data_velocity<0:
             #cv2.putText(img, f'velocity:{data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            draw_text(img, f'velocity:{data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+            self.draw_text(img, f'velocity:{data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
         else:
             #cv2.putText(img, f'velocity:  {data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            draw_text(img, f'velocity:  {data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
+            self.draw_text(img, f'velocity:  {data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
         '''
         
 
         #cv2.putText(img,     f'range  :{data_range}m',(10,660),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-        #draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
-        cv2.imshow("Image window", img)
+        #self.draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
+        
+        #cv2.imshow("Image window", img)
+
         cv2.waitKey(3)
         self.image_pub.publish(image_out)
 
@@ -280,9 +284,7 @@ class Detector:
         obj.bbox.center.y = int(((dimensions[0] + dimensions[2])*image_height)/2)
         
         return obj
-####################################################################################################
-
-def draw_text(img, text,
+    def draw_text(img, text,
           font=cv2.FONT_HERSHEY_SIMPLEX,
           pos=(0, 0),
           font_scale=3,
@@ -291,27 +293,27 @@ def draw_text(img, text,
           text_color_bg=(0, 0, 0)
           ):
 
-    x, y = pos
-    text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
-    text_w, text_h = text_size
-    cv2.rectangle(img, (x-5,y-5), (x + text_w+10, y + text_h+10), text_color_bg, -1)
-    #cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
-    cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+        x, y = pos
+        text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+        text_w, text_h = text_size
+        cv2.rectangle(img, (x-5,y-5), (x + text_w+10, y + text_h+10), text_color_bg, -1)
+        #cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+        cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
 
-    return text_size
-'''
-def callback2(data):
-    if(data.point_id==0):
-        global radar_to_x,degree_tracked
-        radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-'''     
-def marker_array_callback(point):
+        return text_size
+####################################################################################################
+
+updating=0
+tracked_range_predict=0
+tracked_azimuth_predict=0
+def radar_input(point):
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
-    global obj,Vx_m,tracked_range_predict,tracked_azimuth_predict
+    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,tracked_range_predict
     tracked_range=round(point.markers[0].pose.position.x,3)
     tracked_azimuth=round(point.markers[0].pose.position.y,3)
-    #print("prev",prev_tracked_azimuth,"prev_tracked_azimuth!=tracked_azimuth",tracked_azimuth,"t/f",(prev_tracked_azimuth!=tracked_azimuth))
-    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):
+    
+    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):#if there is new data
+        updating=1
         degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
         radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
         radar_to_y=round(50*tracked_range+350)
@@ -331,79 +333,97 @@ def marker_array_callback(point):
         tracked_azimuth_predict=tracked_azimuth
         last_radar=time.time()
         last_update=time.time()
-    else:#update
+    updating=0
+    '''
+    else:#if there is no new data, predict with velocity, kf update
         predict_add=Vx*(time.time()-last_update)
         #print("predict add",predict_add," Vx ",Vx," time ",time.time())
         radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
         tracked_range_predict=tracked_range_predict+0.5*Vy*(time.time()-last_update)
         tracked_azimuth_predict=tracked_azimuth_predict+0.5*Vx_m*(time.time()-last_update)
         last_update=time.time()
-    print(Vx_m," ",Vy)
-    p = PoseStamped()
-    p.header.frame_id="ti_mmwave"
-    p.pose.position.x = tracked_range_predict
-    p.pose.position.y = tracked_azimuth_predict
-    p.pose.position.z = 0.0
-
-    if(Vx_m<0):
-        yaw=90-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
-    else:
-        yaw=270-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
-    yaw=math.radians(-1*yaw)
-    #yaw=5.49779
-    pitch=0.0
-    roll=0.0
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
-    z=sy * cp * cr - cy * sp * sr
-    w=cy * cp * cr + sy * sp * sr
-
-    p.pose.orientation.y = 0.0#vy/norm
-    p.pose.orientation.x = 0.0#vx/norm
-    p.pose.orientation.z = z
-    p.pose.orientation.w = w
+    '''
+    #print(Vx_m," ",Vy)
+    #publish predicted
     
-    #real 45 prog 315
-    #z  0.4871745124605095
-    #w  -0.8733046400935156
-
-    #real 135 prog 180
-    #z  0.8939966636005579
-    #w  -0.4480736161291701
-
-    #real 225 prog 90
-    #z 0.8509035245341184
-    #w 0.5253219888177297
-
-    #real 315 prog 45
-    #z  -0.4871745124605095
-    #w  -0.8733046400935156
-
-    
-
-    obj.pose_pub.publish(p)
     #self.image_pub.publish(image_out)
-    
+def kf_update():
+    global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
+    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer
+    while True:
+        if(time.time()-kf_timer>0.033):
+            kf_timer=time.time()
+            #predict_add=Vx*(time.time()-last_update)
+            #print("predict add",predict_add," Vx ",Vx," time ",time.time())
+            if(updating==0):
+                radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
+                tracked_range_predict=tracked_range_predict+0.5*Vy*(time.time()-last_update)
+                tracked_azimuth_predict=tracked_azimuth_predict+0.5*Vx_m*(time.time()-last_update)
+                last_update=time.time()
 
-def velo_range_callback(data):
-    global data_velocity#, data_range
-    #print("velocity: ",data.data[0]," range ",data.data[1])
-    data_velocity=round(data.data[0],3)
-    #data_range=round(data.data[1],3)
+            
+            p = PoseStamped()
+            p.header.frame_id="ti_mmwave"
+            p.pose.position.x = tracked_range_predict
+            p.pose.position.y = tracked_azimuth_predict
+            p.pose.position.z = 0.0
+            #determine quadrant
+            if(Vx_m<0):
+                yaw=90-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
+            elif (Vx_m>0):
+                yaw=270-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
+            else:
+                yaw=0.0
+
+            #euler angles to 3d vector
+            yaw=math.radians(-1*yaw)
+            pitch=0.0
+            roll=0.0
+            cy = math.cos(yaw * 0.5)
+            sy = math.sin(yaw * 0.5)
+            cp = math.cos(pitch * 0.5)
+            sp = math.sin(pitch * 0.5)
+            cr = math.cos(roll * 0.5)
+            sr = math.sin(roll * 0.5)
+            z=sy * cp * cr - cy * sp * sr
+            w=cy * cp * cr + sy * sp * sr
+
+            p.pose.orientation.y = 0.0#vy/norm
+            p.pose.orientation.x = 0.0#vx/norm
+            p.pose.orientation.z = z
+            p.pose.orientation.w = w
+            pose_pub.publish(p)
+
+            m=Marker()
+            m.header.frame_id="ti_mmwave"
+            m.type = m.SPHERE
+            m.action = m.ADD
+            m.scale.x = 0.4
+            m.scale.y = 0.4
+            m.scale.z = 0.4
+            m.color.a = 1.0
+            m.color.r = 1.0
+            m.color.g = 0.0
+            m.color.b = 0.0
+            m.pose.orientation.w = 1.0
+            m.pose.position.x = tracked_range_predict
+            m.pose.position.y = tracked_azimuth_predict
+            m.pose.position.z = 0.0
+            m_=MarkerArray()
+            m_.markers.append(m)
+            kf_marker.publish(m_)
 
 def main(args):
-    global obj
+    global pose_pub,kf_marker
     rospy.init_node('detector_node')
-
+    pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
+    kf_marker= rospy.Publisher('kf_marker', MarkerArray, queue_size=1)
     #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
-    rospy.Subscriber("/viz",MarkerArray,marker_array_callback)
-    rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
-
-    obj=Detector()
+    rospy.Subscriber("/viz",MarkerArray,radar_input)
+    #rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
+    kf_thread = threading.Thread(target=kf_update)
+    kf_thread.start()
+    #obj=Detector()
     try:
         rospy.spin()
     except KeyboardInterrupt:
