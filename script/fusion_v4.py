@@ -2,7 +2,9 @@
 ## Author: Rohit
 ## Date: July, 25, 2017
 # Purpose: Ros node to detect objects using tensorflow
+
 from __future__ import print_function
+from KF_library import KF
 # ROS related imports
 import rospy
 from std_msgs.msg import String , Header
@@ -347,9 +349,10 @@ def radar_input(point):
     #publish predicted
     
     #self.image_pub.publish(image_out)
-def kf_update():
+def kf_predict():
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
     global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer
+    radar_kf=KF()
     while True:
         if(time.time()-kf_timer>0.033):
             kf_timer=time.time()
@@ -357,8 +360,27 @@ def kf_update():
             #print("predict add",predict_add," Vx ",Vx," time ",time.time())
             if(updating==0):
                 radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
+                x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[Vy],[Vx_m]])
+                '''
+
+                x_predicted=radar_kf.predict(x,time.time()-last_update)
+                print("library",x_predicted)
+                #print("library",radar_kf.predict(x,time.time()-last_update))
                 tracked_range_predict=tracked_range_predict+0.5*Vy*(time.time()-last_update)
                 tracked_azimuth_predict=tracked_azimuth_predict+0.5*Vx_m*(time.time()-last_update)
+                x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[Vy],[Vx_m]])
+                print("mine",x)
+
+                '''
+                x_predicted=radar_kf.predict(x,time.time()-last_update)
+                tracked_range_predict=x_predicted[0][0]
+                tracked_azimuth_predict=x_predicted[1][0]
+                #'''
+                
+                
+
+                
+
                 last_update=time.time()
 
             
@@ -421,7 +443,7 @@ def main(args):
     #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
     rospy.Subscriber("/viz",MarkerArray,radar_input)
     #rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
-    kf_thread = threading.Thread(target=kf_update)
+    kf_thread = threading.Thread(target=kf_predict)
     kf_thread.start()
     #obj=Detector()
     try:
