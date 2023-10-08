@@ -310,11 +310,11 @@ tracked_range_predict=0
 tracked_azimuth_predict=0
 def radar_input(point):
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
-    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,tracked_range_predict
+    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,tracked_range_predict,radar_kf
     tracked_range=round(point.markers[0].pose.position.x,3)
     tracked_azimuth=round(point.markers[0].pose.position.y,3)
     
-    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):#if there is new data
+    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):#if there is new data, update kf
         updating=1
         degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
         radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
@@ -333,8 +333,20 @@ def radar_input(point):
         prev_tracked_azimuth=tracked_azimuth
         tracked_range_predict=tracked_range
         tracked_azimuth_predict=tracked_azimuth
+
+        x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[Vy],[Vx_m]])
+        
+        #print("input",np.transpose(x))
+        #print("output",np.transpose(radar_kf.update(x)))
+        #print(" ")
+
+        x_update=radar_kf.update(x)
+        tracked_range_predict=x_update[0][0]
+        tracked_azimuth_predict=x_update[1][0]
+        
         last_radar=time.time()
         last_update=time.time()
+        publish_object(tracked_range_predict,tracked_azimuth_predict)
     updating=0
     '''
     else:#if there is no new data, predict with velocity, kf update
@@ -351,89 +363,71 @@ def radar_input(point):
     #self.image_pub.publish(image_out)
 def kf_predict():
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,Vy
-    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer
+    global pose_pub,Vx_m,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer,radar_kf
     radar_kf=KF()
     while True:
         if(time.time()-kf_timer>0.033):
             kf_timer=time.time()
-            #predict_add=Vx*(time.time()-last_update)
-            #print("predict add",predict_add," Vx ",Vx," time ",time.time())
-            if(updating==0):
+            if(updating==0):#if kf is not updating
                 radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
-                x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[Vy],[Vx_m]])
-                '''
-
-                x_predicted=radar_kf.predict(x,time.time()-last_update)
-                print("library",x_predicted)
-                #print("library",radar_kf.predict(x,time.time()-last_update))
-                tracked_range_predict=tracked_range_predict+0.5*Vy*(time.time()-last_update)
-                tracked_azimuth_predict=tracked_azimuth_predict+0.5*Vx_m*(time.time()-last_update)
-                x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[Vy],[Vx_m]])
-                print("mine",x)
-
-                '''
-                x_predicted=radar_kf.predict(x,time.time()-last_update)
+                x_predicted=radar_kf.predict(time.time()-last_update)
                 tracked_range_predict=x_predicted[0][0]
                 tracked_azimuth_predict=x_predicted[1][0]
-                #'''
-                
-                
-
-                
-
+                publish_object(tracked_range_predict,tracked_azimuth_predict)
                 last_update=time.time()
 
-            
-            p = PoseStamped()
-            p.header.frame_id="ti_mmwave"
-            p.pose.position.x = tracked_range_predict
-            p.pose.position.y = tracked_azimuth_predict
-            p.pose.position.z = 0.0
-            #determine quadrant
-            if(Vx_m<0):
-                yaw=90-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
-            elif (Vx_m>0):
-                yaw=270-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
-            else:
-                yaw=0.0
+def publish_object(tracked_range_predict,tracked_azimuth_predict):            
+    global kf_marker
+    p = PoseStamped()
+    p.header.frame_id="ti_mmwave"
+    p.pose.position.x = tracked_range_predict
+    p.pose.position.y = tracked_azimuth_predict
+    p.pose.position.z = 0.0
+    #determine quadrant
+    if(Vx_m<0):
+        yaw=90-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
+    elif (Vx_m>0):
+        yaw=270-math.degrees(math.atan(Vy/(-0.01*Vx_m)))
+    else:
+        yaw=0.0
 
-            #euler angles to 3d vector
-            yaw=math.radians(-1*yaw)
-            pitch=0.0
-            roll=0.0
-            cy = math.cos(yaw * 0.5)
-            sy = math.sin(yaw * 0.5)
-            cp = math.cos(pitch * 0.5)
-            sp = math.sin(pitch * 0.5)
-            cr = math.cos(roll * 0.5)
-            sr = math.sin(roll * 0.5)
-            z=sy * cp * cr - cy * sp * sr
-            w=cy * cp * cr + sy * sp * sr
+    #euler angles to 3d vector
+    yaw=math.radians(-1*yaw)
+    pitch=0.0
+    roll=0.0
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    z=sy * cp * cr - cy * sp * sr
+    w=cy * cp * cr + sy * sp * sr
 
-            p.pose.orientation.y = 0.0#vy/norm
-            p.pose.orientation.x = 0.0#vx/norm
-            p.pose.orientation.z = z
-            p.pose.orientation.w = w
-            pose_pub.publish(p)
+    p.pose.orientation.y = 0.0#vy/norm
+    p.pose.orientation.x = 0.0#vx/norm
+    p.pose.orientation.z = z
+    p.pose.orientation.w = w
+    pose_pub.publish(p)
 
-            m=Marker()
-            m.header.frame_id="ti_mmwave"
-            m.type = m.SPHERE
-            m.action = m.ADD
-            m.scale.x = 0.4
-            m.scale.y = 0.4
-            m.scale.z = 0.4
-            m.color.a = 1.0
-            m.color.r = 1.0
-            m.color.g = 0.0
-            m.color.b = 0.0
-            m.pose.orientation.w = 1.0
-            m.pose.position.x = tracked_range_predict
-            m.pose.position.y = tracked_azimuth_predict
-            m.pose.position.z = 0.0
-            m_=MarkerArray()
-            m_.markers.append(m)
-            kf_marker.publish(m_)
+    m=Marker()
+    m.header.frame_id="ti_mmwave"
+    m.type = m.SPHERE
+    m.action = m.ADD
+    m.scale.x = 0.6
+    m.scale.y = 0.6
+    m.scale.z = 0.6
+    m.color.a = 1.0
+    m.color.r = 1.0
+    m.color.g = 0.0
+    m.color.b = 0.0
+    m.pose.orientation.w = 1.0
+    m.pose.position.x = tracked_range_predict
+    m.pose.position.y = tracked_azimuth_predict
+    m.pose.position.z = 0.0
+    m_=MarkerArray()
+    m_.markers.append(m)
+    kf_marker.publish(m_)
 
 def main(args):
     global pose_pub,kf_marker

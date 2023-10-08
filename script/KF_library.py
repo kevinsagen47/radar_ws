@@ -20,10 +20,10 @@ class KF:
         self.x_prior = np.copy(self.x)
         self.P_prior = np.copy(self.P)
 
-        self.F = np.array([[1, delta_t, 0, 0],
-                              [0, 1, 0, 0],
-                              [0, 0, 1, delta_t],
-                              [0, 0, 0, 1]])
+        self.F = np.array([[1, 0, 0.5*delta_t, 0],
+                            [0, 1, 0, 0.5*delta_t],
+                            [0, 0, 1, 0],
+                            [0, 0, 0, 1]])
 
         # Transformation matrix (Observation to State)
         self.H = np.array([[1, 0, 0, 0],
@@ -37,7 +37,7 @@ class KF:
         self.Q[-1, -1] *= 0.01  # process noise
         self.Q[4:, 4:] *= 0.01  # process noise
 
-    def predict(self,x,delta_t):
+    def predict(self,delta_t):
         
         #if self.kf.x[6] + self.kf.x[2] <= 0:
         #    self.kf.x[6] *= 0.0
@@ -48,14 +48,14 @@ class KF:
                             [0, 1, 0, 0.5*delta_t],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]])
-        #self.x = dot(self.F, self.x)                                    # x = Fx
+        self.x = dot(self.F, self.x)                                    # x = Fx
         
-        x = dot(self.F, x)
+        #x = dot(self.F, x)
         self.P = dot(self.F, dot(self.P, self.F.T)) + self.Q            # P = FPF' + Q
-        #self.x_prior = np.copy(self.x)
-        self.x_prior = np.copy(x)
+        self.x_prior = np.copy(self.x)
+        #self.x_prior = np.copy(x)
         self.P_prior = np.copy(self.P)
-        return x
+        return self.x
     
     def update(self, z):
         """
