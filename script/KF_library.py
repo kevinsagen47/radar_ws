@@ -57,7 +57,7 @@ class KF:
         self.P_prior = np.copy(self.P)
         return self.x
     
-    def update(self, z):
+    def update(self, z,R):
         """
         Updates track with new observation and returns itself after update
         :param new_detection: (np.ndarray) new observation in format [x1,x2,y1,y2]
@@ -65,6 +65,9 @@ class KF:
         """
         y = z - np.dot(self.H, self.x)
         PHT = dot(self.P, self.H.T)
+        
+        self.R = eye(self.dim_z)
+        self.R[2:, 2:] *= R  # observation error covariance
 
         # S = HPH' + R (Project system uncertainty into measurement space)
         S = dot(self.H, PHT) + self.R

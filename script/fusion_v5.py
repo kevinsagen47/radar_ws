@@ -17,7 +17,7 @@ import math
 import sys
 import rospy
 import cv2
-from motrackers import CentroidTracker, CentroidKF_Tracker, SORT, IOUTracker
+from motrackers import CentroidTracker#, CentroidKF_Tracker, SORT, IOUTracker
 from motrackers.utils import draw_tracks
 
 from std_msgs.msg import String
@@ -28,7 +28,7 @@ from visualization_msgs.msg import MarkerArray,Marker
 from std_msgs.msg import Float32MultiArray
 import time
 from geometry_msgs.msg import PoseStamped
-
+import keyboard
 import tf as transferfunction
 import threading
 import os
@@ -51,6 +51,13 @@ Vx=0
 azimuth_speed=0
 range_speed=0
 kf_timer=0
+cam_to_x=0
+cam_to_y=0
+
+last_cam_update=0
+prev_cam_range=0
+prev_cam_azimuth=0
+exit=0
 #######################################################################
 #                        DETECTION                                    #
 #######################################################################
@@ -107,7 +114,7 @@ config = tf.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = GPU_FRACTION
 #'''
 # Detection
-
+gamma=1.0
 class Detector:
 
     def __init__(self):
@@ -122,17 +129,20 @@ class Detector:
 
     def image_cb(self, data):
         global radar_to_x,locked,locked_with,tracked_azimuth,radar_to_y
-        global data_velocity, data_range,tracked_range
+        global data_velocity, data_range,tracked_range,cam_to_y,cam_to_x
+        global last_cam_update,prev_cam_azimuth,prev_cam_range,gamma
         objArray = Detection2DArray()
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            
         except CvBridgeError as e:
             print(e)
         image=cv2.cvtColor(cv_image,cv2.COLOR_BGR2RGB)
-
+        image = self.adjust_gamma(image, gamma)
         # the array based representation of the image will be used later in order to prepare the
         # result image with boxes and labels on it.
         image_np = np.asarray(image)
+        
         # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
         image_np_expanded = np.expand_dims(image_np, axis=0)
         image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
@@ -227,9 +237,40 @@ class Detector:
                     #'''
                     x_min_cali=tracked_image[i][2]
                     x_max_cali=tracked_image[i][2]+tracked_image[0][4]
-                    if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<0.5):
-                        #print(current_ground_truth_y," ",tracked_range)
-                        print(x_max_cali-x_min_cali," ",tracked_range)
+
+                    u_to_degree=(640-current_ground_truth_x)/14.5
+                    degree_to_radian=u_to_degree*math.pi/180
+                    tan_degree=math.tan(degree_to_radian)
+                    if(u_to_degree!=0):
+                        cam_to_x=tracked_range*tan_degree
+
+                    cam_to_y=tracked_range
+                    #'''
+                    if((time.time()-last_radar)<0.5):
+                        #cam_to_y=tracked_range
+                        cam_range_speed=range_speed
+                    else:
+                        cam_range_speed=0
+                        #cam_to_y=500/(x_max_cali-x_min_cali)
+                    #'''
+                    
+                    last_cam_delta=time.time()-last_cam_update
+                    #cam_range_speed=(cam_to_y-prev_cam_range)/last_cam_delta#range in meters
+                    #cam_azimuth_speed=(cam_to_x-prev_cam_azimuth)/last_cam_delta#azimuth in meters
+
+                    x=np.array([[cam_to_y],[cam_to_x],[cam_range_speed],[azimuth_speed]])
+                    x_update=radar_kf.update(x,100.)
+                    publish_object(x_update)
+                    last_cam_update=time.time()
+                    prev_cam_range=cam_to_y
+                    prev_cam_azimuth=cam_to_x
+                    
+                    
+
+
+                    #if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<0.5):
+                    #    #print(current_ground_truth_y," ",tracked_range)
+                    #    print(x_max_cali-x_min_cali," ",tracked_range)
                     #'''
 
         #current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
@@ -315,6 +356,13 @@ class Detector:
         cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
 
         return text_size
+    def adjust_gamma(self,image, gamma):
+
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255
+            for i in np.arange(0, 256)]).astype("uint8")
+
+        return cv2.LUT(image, table)
 ####################################################################################################
 
 updating=0
@@ -352,7 +400,7 @@ def radar_input(point):#radar update
         #print("output",np.transpose(radar_kf.update(x)))
         #print(" ")
 
-        x_update=radar_kf.update(x)
+        x_update=radar_kf.update(x,10.)
         tracked_range_predict=x_update[0][0]
         tracked_azimuth_predict=x_update[1][0]
         
@@ -360,6 +408,8 @@ def radar_input(point):#radar update
         last_update=time.time()
         publish_object(x_update)
     updating=0
+    if(exit==1):
+        sys.exit()
     '''
     else:#if there is no new data, predict with velocity, kf update
         predict_add=Vx*(time.time()-last_update)
@@ -375,10 +425,11 @@ def radar_input(point):#radar update
     #self.image_pub.publish(image_out)
 def kf_predict():
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,range_speed
-    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer,radar_kf
+    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer,radar_kf,gamma
     
     while True:
-        if(time.time()-kf_timer>0.033):
+        #try:
+        if(time.time()-kf_timer>0.033 and time.time()-last_radar<1):
             kf_timer=time.time()
             if(updating==0):#if kf is not updating
                 radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
@@ -389,9 +440,20 @@ def kf_predict():
                 last_update=time.time()
         else:
             time.sleep(0.02)
-
+            if(exit==1):
+                break
+    sys.exit()
+                
+                
+                
+            
+            
+        #except KeyboardInterrupt:
+        #    break
+    
+persistence_id=0
 def publish_object(x):            
-    global kf_marker
+    global kf_marker,cam_to_x,cam_to_y,m_array,persistence_id
     p = PoseStamped()
     p.header.frame_id="ti_mmwave"
     p.pose.position.x = x[0][0]#tracked_range_predict
@@ -426,11 +488,13 @@ def publish_object(x):
 
     m=Marker()
     m.header.frame_id="ti_mmwave"
+    persistence_id+=1
+    m.id = persistence_id
     m.type = m.SPHERE
     m.action = m.ADD
-    m.scale.x = 0.6
-    m.scale.y = 0.6
-    m.scale.z = 0.6
+    m.scale.x = 0.1
+    m.scale.y = 0.1
+    m.scale.z = 0.1
     m.color.a = 1.0
     m.color.r = 1.0
     m.color.g = 0.0
@@ -439,21 +503,71 @@ def publish_object(x):
     m.pose.position.x = x[0][0]
     m.pose.position.y = x[1][0]
     m.pose.position.z = 0.0
-    m_=MarkerArray()
-    m_.markers.append(m)
-    kf_marker.publish(m_)
+    
+    #m_array=MarkerArray()
+    m_array.markers.append(m)
 
+    m2=Marker()
+    m2.header.frame_id="ti_mmwave"
+    m2.id = 2
+    m2.type = m.SPHERE
+    m2.action = m.ADD
+    m2.scale.x = 0.6
+    m2.scale.y = 0.6
+    m2.scale.z = 0.6
+    m2.color.a = 1.0
+    m2.color.r = 0.0
+    m2.color.g = 1.0
+    m2.color.b = 0.0
+    m2.pose.orientation.w = 1.0
+    m2.pose.position.x = cam_to_y
+    m2.pose.position.y = cam_to_x
+    m2.pose.position.z = 0.0
+    #m_array.markers.append(m2)
+    if(persistence_id>50):
+        m_array.markers.pop(0)
+    kf_marker.publish(m_array)
+
+def getchar():
+   #Returns a single character from standard input
+   import tty, termios, sys
+   fd = sys.stdin.fileno()
+   old_settings = termios.tcgetattr(fd)
+   try:
+      tty.setraw(sys.stdin.fileno())
+      ch = sys.stdin.read(1)
+   finally:
+      termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+   return ch
+def keyboard_pressed():
+    global gamma,exit
+    while True:
+        ch=getchar()
+        if (ch=='d'):  
+            gamma=0.1
+        if (ch=='s'):  
+            gamma=1.0
+        if (ch=='a'):  
+            gamma=10.0
+        if (ch=='q'): 
+            time.sleep(1) 
+            exit=1
+            break
 def main(args):
-    global pose_pub,kf_marker,radar_kf
+    global pose_pub,kf_marker,radar_kf,m_array
     rospy.init_node('detector_node')
     pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
     kf_marker= rospy.Publisher('kf_marker', MarkerArray, queue_size=1)
+    m_array=MarkerArray()
     #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
     rospy.Subscriber("/viz",MarkerArray,radar_input)
     #rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
     radar_kf=KF()
     kf_thread = threading.Thread(target=kf_predict)
     kf_thread.start()
+
+    key_thread = threading.Thread(target=keyboard_pressed)
+    key_thread.start()
     obj=Detector()
     try:
         rospy.spin()
