@@ -1,5 +1,5 @@
-//#include "kf_tracker/CKalmanFilter.h"
-//#include "kf_tracker/featureDetection.h"
+#include "kf_tracker/CKalmanFilter.h"
+#include "kf_tracker/featureDetection.h"
 #include "opencv2/video/tracking.hpp"
 #include "pcl_ros/point_cloud.h"
 #include <algorithm>
@@ -37,17 +37,12 @@
 #include <utility>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include "kf_tracker/point_types.h"
-#include <pcl/point_types.h>
-#include <pcl/filters/passthrough.h>
-#include <std_msgs/Float32MultiArray.h>
-#include <std_msgs/MultiArrayDimension.h>
+
 using namespace std;
 using namespace cv;
 
 ros::Publisher objID_pub;
-int count_kf;
-float point_speed;
+
 // KF init
 int stateDim = 4; // [x,y,v_x,v_y]//,w,h]
 int measDim = 2;  // [z_x,z_y,z_w,z_h]
@@ -67,7 +62,6 @@ ros::Publisher pub_cluster4;
 ros::Publisher pub_cluster5;
 
 ros::Publisher markerPub;
-ros::Publisher velo_range_pub;
 
 std::vector<geometry_msgs::Point> prevClusterCenters;
 
@@ -161,10 +155,8 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
     pt.z = (*it).at<float>(2);
 
     KFpredictions.push_back(pt);
-    //count_kf++;
-    //cout<<"Got predictions"<< count_kf <<" "<<pt.x<<" "<<pt.y<<" "<<pt.z<<"\n";
   }
-  //count_kf=0;
+  // cout<<"Got predictions"<<"\n";
 
   // Find the cluster that is more probable to be belonging to a given KF.
   objID.clear();   // Clear the objID vector
@@ -193,21 +185,19 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
     not assigned to another cluster copyOfClusterCenters[ID].y=10000;
      copyOfClusterCenters[ID].z=10000;
     */
-    /////////////////////////////////////////////////cout << "filterN=" << filterN << "\n";
+    cout << "filterN=" << filterN << "\n";
   }
 
-  /////////////////////////////////////////////cout << "distMat.size()" << distMat.size() << "\n";
-  /////////////////////////////////////////////cout << "distMat[0].size()" << distMat.at(0).size() << "\n";
+  cout << "distMat.size()" << distMat.size() << "\n";
+  cout << "distMat[0].size()" << distMat.at(0).size() << "\n";
   // DEBUG: print the distMat
-  /*
   for (const auto &row : distMat) {
     for (const auto &s : row)
       std::cout << s << ' ';
     std::cout << std::endl;
   }
-  */////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /*
-  for (int clusterCount = 0; clusterCount < 6; clusterCount++) {////////////////////////////////////////////////////////////////////
+
+  for (int clusterCount = 0; clusterCount < 6; clusterCount++) {
     // 1. Find min(distMax)==> (i,j);
     std::pair<int, int> minIndex(findIndexOfMin(distMat));
     cout << "Received minIndex=" << minIndex.first << "," << minIndex.second
@@ -226,8 +216,6 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
     // 4. if(counter<6) got to 1.
     cout << "clusterCount=" << clusterCount << "\n";
   }
-  */
-
 
   // cout<<"Got object IDs"<<"\n";
   // countIDs(objID);// for verif/corner cases
@@ -264,8 +252,6 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
     m.pose.position.z = clusterC.z;
 
     clusterMarkers.markers.push_back(m);
-
-    //cout<<"Marker"<< i <<" "<<clusterC.x<<" "<<clusterC.y<<" "<<clusterC.z<<"\n";
   }
 
   prevClusterCenters = clusterCenters;
@@ -332,32 +318,7 @@ void publish_cloud(ros::Publisher &pub,
   pub.publish(*clustermsg);
 }
 
-/*
-
-static void radarTargetArrayToROSCloud( const ainstein_radar_msgs::RadarTargetArray& target_array,
-					    sensor_msgs::PointCloud2& ros_cloud )
-    {
-      pcl::PointCloud<PointRadarTarget> pcl_cloud;
-      radarTargetArrayToPclCloud( target_array, pcl_cloud );
-
-      pcl::toROSMsg( pcl_cloud, ros_cloud );
-      ros_cloud.header.frame_id = target_array.header.frame_id;
-      ros_cloud.header.stamp = target_array.header.stamp;
-    }
-
-    
-    static void rosCloudToRadarTargetArray( const sensor_msgs::PointCloud2& ros_cloud,
-					    ainstein_radar_msgs::RadarTargetArray& target_array )
-    {
-      // Convert to PCL cloud and use the appropriate conversion function above
-      pcl::PointCloud<PointRadarTarget> pcl_cloud;
-      pcl::fromROSMsg( ros_cloud, pcl_cloud );
-
-      pclCloudToRadarTargetArray( pcl_cloud, target_array );
-    }
-*/
-//void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)	
-void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
+void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)
 
 {
   // cout<<"IF firstFrame="<<firstFrame<<"\n";
@@ -398,8 +359,8 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     // [ 0  0  0    1 Ev_y 0 ]
     //// [ 0  0  0    0 1    Ew ]
     //// [ 0  0  0    0 0    Eh ]
-    float sigmaP = 8e-3;//0.01;
-    float sigmaQ = 0.15;//0.1
+    float sigmaP = 0.01;
+    float sigmaQ = 0.1;
     setIdentity(KF0.processNoiseCov, Scalar::all(sigmaP));
     setIdentity(KF1.processNoiseCov, Scalar::all(sigmaP));
     setIdentity(KF2.processNoiseCov, Scalar::all(sigmaP));
@@ -415,8 +376,6 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     cv::setIdentity(KF5.measurementNoiseCov, cv::Scalar(sigmaQ));
 
     // Process the point cloud
-    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_cloud (
-        new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud(
@@ -424,31 +383,15 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     /* Creating the KdTree from input point cloud*/
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
         new pcl::search::KdTree<pcl::PointXYZ>);
-    
-    //pcl::PointCloud2::Ptr clustermsg(new sensor_msgs::PointCloud2);
 
-    sensor_msgs::PointCloud2 pcl_pc2;
-    pcl::toROSMsg(*input,pcl_pc2);
-
-    //pcl::fromROSMsg(*input, *input_cloud);
-    //pcl::fromPCLPointCloud2(pcl_pc2,*input_cloud);
-    //pcl_conversions::toPCL(pcl_pc2,*input_cloud);
-    
-    pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
-
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud (unfiltered_cloud);
-    pass.setFilterFieldName ("x");
-    pass.setFilterLimits (0.1, 10.0);
-    //pass.setNegative (true);
-    pass.filter (*input_cloud);
+    pcl::fromROSMsg(*input, *input_cloud);
 
     tree->setInputCloud(input_cloud);
 
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(0.08);
-    ec.setMinClusterSize(1);
+    ec.setClusterTolerance(0.8);
+    ec.setMinClusterSize(2);
     ec.setMaxClusterSize(600);
     ec.setSearchMethod(tree);
     ec.setInputCloud(input_cloud);
@@ -569,33 +512,15 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
 
   else {
     // cout<<"ELSE firstFrame="<<firstFrame<<"\n";
-    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_cloud (
-        new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     /* Creating the KdTree from input point cloud*/
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
-        //new pcl::search::KdTree<radar_pcl::PointXYZIVR>);
         new pcl::search::KdTree<pcl::PointXYZ>);
-    //
-    sensor_msgs::PointCloud2 pcl_pc2;
-    //pcl_conversions::toPCL not work
-    //pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
 
-    
-    //radar message to pointcloud2
-    pcl::toROSMsg(*input,pcl_pc2);
-
-    //point cloud 2 to pointcloud
-    pcl::fromROSMsg(pcl_pc2,*unfiltered_cloud);
-
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud (unfiltered_cloud);
-    pass.setFilterFieldName ("x");
-    pass.setFilterLimits (0.3, 10.0);
-    pass.filter (*input_cloud);
+    pcl::fromROSMsg(*input, *input_cloud);
 
     tree->setInputCloud(input_cloud);
 
@@ -607,7 +532,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
      */
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(0.8);
+    ec.setClusterTolerance(0.7);
     ec.setMinClusterSize(3);
     ec.setMaxClusterSize(600);
     ec.setSearchMethod(tree);
@@ -635,12 +560,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     for (it = cluster_indices.begin(); it != cluster_indices.end(); ++it) {
       float x = 0.0;
       float y = 0.0;
-      float velocity_data=0.0;
-      float range_data=0.0,point_range=0.0;
       int numPts = 0;
-      int veloPts=0;
-      int rangePts=0;
-      count_kf++;
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(
           new pcl::PointCloud<pcl::PointXYZ>);
       for (pit = it->indices.begin(); pit != it->indices.end(); pit++) {
@@ -650,35 +570,12 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
         x += input_cloud->points[*pit].x;
         y += input_cloud->points[*pit].y;
         numPts++;
-        
-        velocity_data+=(*input).points[*pit].velocity;
-        range_data+=(*input).points[*pit].range;
-        if ((*input).points[*pit].range!=0){rangePts++;}
-        if ((*input).points[*pit].velocity!=0){veloPts++; /*cout<<(*input).points[*pit].velocity<<endl;*/}
-        //cout<<(*input).points[0].x<<"\n";
+
         // dist_this_point = pcl::geometry::distance(input_cloud->points[*pit],
         //                                          origin);
         // mindist_this_cluster = std::min(dist_this_point,
         // mindist_this_cluster);
       }
-      if(rangePts!=0)point_range=range_data/rangePts;
-      else range_data=0;
-
-      if(veloPts!=0)point_speed=velocity_data/veloPts;
-      else point_speed=0;
-      cout<<"cluster "<<count_kf<<" speed "<<" "<<point_speed<<" range "<<range_data<<endl;
-      count_kf=0;
-      
-      std_msgs::Float32MultiArray velo_range_msg;
-      velo_range_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());  
-      velo_range_msg.layout.dim[0].size = 2;
-      velo_range_msg.layout.dim[0].stride = 1;
-      velo_range_msg.layout.dim[0].label = "debug";
-
-      velo_range_msg.data.push_back(point_speed); 
-      velo_range_msg.data.push_back(point_range); 
-
-      velo_range_pub.publish(velo_range_msg);
 
       pcl::PointXYZ centroid;
       centroid.x = x / numPts;
@@ -689,10 +586,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
 
       // Get the centroid of the cluster
       clusterCentroids.push_back(centroid);
-      //count_kf++;
     }
-    //cout<<"cluster points"<<count_kf<<endl;
-    //count_kf=0;
     // cout<<"cluster_vec got some clusters\n";
 
     // Ensure at least 6 clusters exist to publish (later clusters may be empty)
@@ -728,7 +622,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
          it++) { // cout<<"Inside the for loop\n";
 
       switch (i) {
-        //cout << "Inside the switch case\n";
+        cout << "Inside the switch case\n";
       case 0: {
         publish_cloud(pub_cluster0, cluster_vec[*it]);
         publishedCluster[i] =
@@ -778,7 +672,7 @@ void cloud_cb(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
     }
   }
 }
-//*
+
 int main(int argc, char **argv) {
   // ROS init
   ros::init(argc, argv, "kf_tracker");
@@ -790,9 +684,7 @@ int main(int argc, char **argv) {
   cout << "About to setup callback\n";
 
   // Create a ROS subscriber for the input point cloud
-  //ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
-  ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb);
-  //ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb);
+  ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
   // Create a ROS publisher for the output point cloud
   pub_cluster0 = nh.advertise<sensor_msgs::PointCloud2>("cluster_0", 1);
   pub_cluster1 = nh.advertise<sensor_msgs::PointCloud2>("cluster_1", 1);
@@ -800,43 +692,17 @@ int main(int argc, char **argv) {
   pub_cluster3 = nh.advertise<sensor_msgs::PointCloud2>("cluster_3", 1);
   pub_cluster4 = nh.advertise<sensor_msgs::PointCloud2>("cluster_4", 1);
   pub_cluster5 = nh.advertise<sensor_msgs::PointCloud2>("cluster_5", 1);
-  velo_range_pub = nh.advertise<std_msgs::Float32MultiArray>("velo_range_array", 1);
   // Subscribe to the clustered pointclouds
   // ros::Subscriber c1=nh.subscribe("ccs",100,KFT);
   objID_pub = nh.advertise<std_msgs::Int32MultiArray>("obj_id", 1);
-  
+  /* Point cloud clustering
+   */
 
   // cc_pos=nh.advertise<std_msgs::Float32MultiArray>("ccs",100);//clusterCenter1
   markerPub = nh.advertise<visualization_msgs::MarkerArray>("viz", 1);
 
+  /* Point cloud clustering
+   */
 
   ros::spin();
 }
-//*/
-/*
-void cloud_cb2(const pcl::PointCloud<radar_pcl::PointXYZIVR>::ConstPtr& input)
-{
-    //Eigen::VectorXf ev = Eigen::VectorXf::Map((*input).points[0], 17);
-    //cout<<ev<<"\n";
-    cout<<(*input).points[0].x<<"\n";
-    //cout<<Eigen::VectorXf((*input).points)<<"\n";
-    //cout << typeid((*input).points).name() << '\n';
-
-}
-
-int main(int argc, char **argv) {
-  // ROS init
-  ros::init(argc, argv, "kf_tracker");
-  ros::NodeHandle nh;
-  std::string topic = nh.resolveName("point_types");
-
-  // Publishers to publish the state of the objects (pos and vel)
-  // objState1=nh.advertise<geometry_msgs::Twist> ("obj_1",1);
-
-  cout << "About to setup callback\n";
-
-  // Create a ROS subscriber for the input point cloud
-  ///ros::Subscriber sub = nh.subscribe("filtered_cloud", 1, cloud_cb);
-  ros::Subscriber sub = nh.subscribe<pcl::PointCloud<radar_pcl::PointXYZIVR>> ("filtered_cloud", 1, cloud_cb2);
-  ros::spin();
-}*/

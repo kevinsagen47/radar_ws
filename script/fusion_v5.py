@@ -58,6 +58,7 @@ last_cam_update=0
 prev_cam_range=0
 prev_cam_azimuth=0
 exit=0
+cam_updating=0
 #######################################################################
 #                        DETECTION                                    #
 #######################################################################
@@ -130,7 +131,7 @@ class Detector:
     def image_cb(self, data):
         global radar_to_x,locked,locked_with,tracked_azimuth,radar_to_y
         global data_velocity, data_range,tracked_range,cam_to_y,cam_to_x
-        global last_cam_update,prev_cam_azimuth,prev_cam_range,gamma
+        global last_cam_update,prev_cam_azimuth,prev_cam_range,gamma,cam_updating,radar_updating
         objArray = Detection2DArray()
         try:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -233,7 +234,7 @@ class Detector:
                     current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
                     #x_min=tracked_image[i][2]
                     #x_max=tracked_image[i][2]+tracked_image[0][4]
-                    
+                    #print("radar_to_x locked with ID",locked_with)
                     #'''
                     x_min_cali=tracked_image[i][2]
                     x_max_cali=tracked_image[i][2]+tracked_image[0][4]
@@ -257,10 +258,15 @@ class Detector:
                     last_cam_delta=time.time()-last_cam_update
                     #cam_range_speed=(cam_to_y-prev_cam_range)/last_cam_delta#range in meters
                     #cam_azimuth_speed=(cam_to_x-prev_cam_azimuth)/last_cam_delta#azimuth in meters
+                    if(radar_updating==0):
+                        cam_updating=1
+                        x=np.array([[cam_to_y],[cam_to_x],[cam_range_speed],[azimuth_speed]])
+                        #print(x[1][0],x[0][0])
+                        x_update=radar_kf.update(x,1000.)
 
-                    x=np.array([[cam_to_y],[cam_to_x],[cam_range_speed],[azimuth_speed]])
-                    x_update=radar_kf.update(x,100.)
-                    publish_object(x_update)
+                    if((time.time()-last_radar)>0.5):
+                        publish_object(x_update)
+                    cam_updating=0
                     last_cam_update=time.time()
                     prev_cam_range=cam_to_y
                     prev_cam_azimuth=cam_to_x
@@ -365,49 +371,50 @@ class Detector:
         return cv2.LUT(image, table)
 ####################################################################################################
 
-updating=0
+radar_updating=0
 tracked_range_predict=0
 tracked_azimuth_predict=0
 def radar_input(point):#radar update
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,range_speed
-    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,tracked_range_predict,radar_kf
+    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,radar_updating,tracked_range_predict,radar_kf,cam_updating
     tracked_range=round(point.markers[0].pose.position.x,3)
     tracked_azimuth=round(point.markers[0].pose.position.y,3)
-    
-    if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range):#if there is new data, update kf
-        updating=1
-        degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
-        radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-        radar_to_y=round(50*tracked_range+350)
-        data_range=round(tracked_range,3)
+    #print(tracked_azimuth,tracked_range)
+    if(cam_updating==0):
+        if(prev_tracked_azimuth!=tracked_azimuth or prev_tracked_range!=tracked_range ):#if there is new data, update kf
+            radar_updating=1
+            degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
+            radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+            radar_to_y=round(50*tracked_range+350)
+            data_range=round(tracked_range,3)
 
-        last_radar_delta=time.time()-last_radar
-        range_speed=(tracked_range-prev_tracked_range)/last_radar_delta#range in meters
-        azimuth_speed=(tracked_azimuth-prev_tracked_azimuth)/last_radar_delta#azimuth in meters
-        Vx=(radar_to_x-prev_radar_to_x)/last_radar_delta#azimuth but in pixel
-        #print("Vx ",Vx," range_speed ",range_speed, "delta time",last_radar_delta)
-        #print((radar_to_x-prev_radar_to_x))
-        #print("Vx ",Vx)
-        prev_radar_to_x=radar_to_x
-        prev_tracked_range=tracked_range
-        prev_tracked_azimuth=tracked_azimuth
-        tracked_range_predict=tracked_range
-        tracked_azimuth_predict=tracked_azimuth
+            last_radar_delta=time.time()-last_radar
+            range_speed=(tracked_range-prev_tracked_range)/last_radar_delta#range in meters
+            azimuth_speed=(tracked_azimuth-prev_tracked_azimuth)/last_radar_delta#azimuth in meters
+            Vx=(radar_to_x-prev_radar_to_x)/last_radar_delta#azimuth but in pixel
+            #print("Vx ",Vx," range_speed ",range_speed, "delta time",last_radar_delta)
+            #print((radar_to_x-prev_radar_to_x))
+            #print("Vx ",Vx)
+            prev_radar_to_x=radar_to_x
+            prev_tracked_range=tracked_range
+            prev_tracked_azimuth=tracked_azimuth
+            tracked_range_predict=tracked_range
+            tracked_azimuth_predict=tracked_azimuth
 
-        x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[range_speed],[azimuth_speed]])
-        
-        #print("input",np.transpose(x))
-        #print("output",np.transpose(radar_kf.update(x)))
-        #print(" ")
+            x=np.array([[tracked_range_predict],[tracked_azimuth_predict],[range_speed],[azimuth_speed]])
+            
+            #print("input",np.transpose(x))
+            #print("output",np.transpose(radar_kf.update(x)))
+            #print(" ")
 
-        x_update=radar_kf.update(x,10.)
-        tracked_range_predict=x_update[0][0]
-        tracked_azimuth_predict=x_update[1][0]
-        
-        last_radar=time.time()
-        last_update=time.time()
-        publish_object(x_update)
-    updating=0
+            x_update=radar_kf.update(x,10.)
+            tracked_range_predict=x_update[0][0]
+            tracked_azimuth_predict=x_update[1][0]
+            
+            last_radar=time.time()
+            last_update=time.time()
+            publish_object(x_update)
+    radar_updating=0
     if(exit==1):
         sys.exit()
     '''
@@ -425,13 +432,13 @@ def radar_input(point):#radar update
     #self.image_pub.publish(image_out)
 def kf_predict():
     global tracked_range,tracked_azimuth,degree_tracked,data_range,radar_to_x,last_radar,radar_to_y,prev_tracked_range,prev_tracked_azimuth,prev_radar_to_x,last_update,Vx,range_speed
-    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,updating,kf_timer,radar_kf,gamma
+    global pose_pub,azimuth_speed,tracked_range_predict,tracked_azimuth_predict,kf_marker,radar_updating,kf_timer,radar_kf,gamma
     
     while True:
         #try:
         if(time.time()-kf_timer>0.033 and time.time()-last_radar<1):
             kf_timer=time.time()
-            if(updating==0):#if kf is not updating
+            if(radar_updating==0 and cam_updating==0):#if kf is not radar_updating
                 radar_to_x=round(radar_to_x+0.1*Vx*(time.time()-last_update))
                 x_predicted=radar_kf.predict(time.time()-last_update)
                 tracked_range_predict=x_predicted[0][0]
@@ -439,7 +446,7 @@ def kf_predict():
                 publish_object(x_predicted)
                 last_update=time.time()
         else:
-            time.sleep(0.02)
+            time.sleep(0.05)
             if(exit==1):
                 break
     sys.exit()
@@ -459,6 +466,7 @@ def publish_object(x):
     p.pose.position.x = x[0][0]#tracked_range_predict
     p.pose.position.y = x[1][0]#tracked_azimuth_predict
     p.pose.position.z = 0.0
+    print(x[1][0],x[0][0])
     #determine quadrant
     if(x[3][0]<0):
         yaw=90-math.degrees(math.atan(x[2][0]/(-0.01*x[3][0])))
@@ -488,13 +496,13 @@ def publish_object(x):
 
     m=Marker()
     m.header.frame_id="ti_mmwave"
-    persistence_id+=1
+    persistence_id=1
     m.id = persistence_id
     m.type = m.SPHERE
     m.action = m.ADD
-    m.scale.x = 0.1
-    m.scale.y = 0.1
-    m.scale.z = 0.1
+    m.scale.x = 0.2
+    m.scale.y = 0.2
+    m.scale.z = 0.2
     m.color.a = 1.0
     m.color.r = 1.0
     m.color.g = 0.0
@@ -512,9 +520,9 @@ def publish_object(x):
     m2.id = 2
     m2.type = m.SPHERE
     m2.action = m.ADD
-    m2.scale.x = 0.6
-    m2.scale.y = 0.6
-    m2.scale.z = 0.6
+    m2.scale.x = 0.2
+    m2.scale.y = 0.2
+    m2.scale.z = 0.2
     m2.color.a = 1.0
     m2.color.r = 0.0
     m2.color.g = 1.0
@@ -523,7 +531,7 @@ def publish_object(x):
     m2.pose.position.x = cam_to_y
     m2.pose.position.y = cam_to_x
     m2.pose.position.z = 0.0
-    #m_array.markers.append(m2)
+    m_array.markers.append(m2)
     if(persistence_id>50):
         m_array.markers.pop(0)
     kf_marker.publish(m_array)
@@ -545,6 +553,11 @@ def keyboard_pressed():
         ch=getchar()
         if (ch=='d'):  
             gamma=0.1
+            print("GOING DARKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+            print(" ")
+            print(" ")
+            print(" ")
+            print(" ")
         if (ch=='s'):  
             gamma=1.0
         if (ch=='a'):  
@@ -567,7 +580,7 @@ def main(args):
     kf_thread.start()
 
     key_thread = threading.Thread(target=keyboard_pressed)
-    key_thread.start()
+    #key_thread.start()
     obj=Detector()
     try:
         rospy.spin()

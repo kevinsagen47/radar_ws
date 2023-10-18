@@ -57,13 +57,18 @@ class KF:
         self.P_prior = np.copy(self.P)
         return self.x
     
-    def update(self, z,R):
+    def update(self, z,R=10.):
         """
         Updates track with new observation and returns itself after update
         :param new_detection: (np.ndarray) new observation in format [x1,x2,y1,y2]
         :return: KalmanTrack object class (itself after update)
         """
+        
         y = z - np.dot(self.H, self.x)
+        if(R>11):
+            y[2][0]=0.
+            y[3][0]=0.
+
         PHT = dot(self.P, self.H.T)
         
         self.R = eye(self.dim_z)
