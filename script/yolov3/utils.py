@@ -471,7 +471,7 @@ def detect_video(Yolo, video_path, output_path, input_size=416, show=False, CLAS
         image = cv2.putText(image, "Time: {:.1f}FPS".format(fps), (0, 30), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 2)
         # CreateXMLfile("XML_Detections", str(int(time.time())), original_image, bboxes, read_class_names(CLASSES))
         
-        print("Time: {:.2f}ms, Detection FPS: {:.1f}, total FPS: {:.1f}".format(ms, fps, fps2))
+        #print("Time: {:.2f}ms, Detection FPS: {:.1f}, total FPS: {:.1f}".format(ms, fps, fps2))
         if output_path != '': out.write(image)
         if show:
             cv2.imshow('output', image)
@@ -529,7 +529,7 @@ def detect_realtime(Yolo, output_path, input_size=416, show=False, CLASSES=YOLO_
         ms = sum(times)/len(times)*1000
         fps = 1000 / ms
         
-        print("Time: {:.2f}ms, {:.1f} FPS".format(ms, fps))
+        #print("Time: {:.2f}ms, {:.1f} FPS".format(ms, fps))
 
         frame = draw_bbox(original_frame, bboxes, CLASSES=CLASSES, rectangle_colors=rectangle_colors)
         # CreateXMLfile("XML_Detections", str(int(time.time())), original_frame, bboxes, read_class_names(CLASSES))

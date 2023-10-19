@@ -1,8 +1,12 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import cv2
+from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+tf.keras.utils.disable_interactive_logging()
+tf.debugging.disable_traceback_filtering()
 from yolov3.utils import Load_Yolo_model, image_preprocess, postprocess_boxes, nms, draw_bbox, read_class_names
 from yolov3.configs import *
 import time
@@ -13,7 +17,8 @@ from deep_sort.tracker import Tracker
 from deep_sort import generate_detections as gdet
 import sys
 import rospy
-
+from sensor_msgs.msg import Image
+import math
 video_path   = "test.mp4"
 
 #def Object_tracking(Yolo, video_path, output_path, input_size=416, show=False, CLASSES=YOLO_COCO_CLASSES, score_threshold=0.3, iou_threshold=0.45, rectangle_colors='', Track_only = []):
@@ -22,7 +27,9 @@ class detector_tracker:
         #self.image_pub = rospy.Publisher("debug_image",Image, queue_size=1)
         self.yolo = Load_Yolo_model()
         self.input_size=416
-        self.show=True
+        self.show=False
+        self.publish_ros=True
+        self.draw_radar_points=True
         self.CLASSES=YOLO_COCO_CLASSES
         self.score_threshold=0.3
         self.iou_threshold=0.1
@@ -31,7 +38,7 @@ class detector_tracker:
         # Definition of the parameters
         self.max_cosine_distance = 0.7
         self.nn_budget = None
-        
+        self.bridge = CvBridge()
         #initialize deep sort object
         self.model_filename = 'model_data/mars-small128.pb'
         self.encoder = gdet.create_box_encoder(self.model_filename, batch_size=1)
@@ -50,8 +57,9 @@ class detector_tracker:
         self.NUM_CLASS = read_class_names(self.CLASSES)
         self.key_list = list(self.NUM_CLASS.keys()) 
         self.val_list = list(self.NUM_CLASS.values())
-    
-    def image_callback(self,frame):
+        self.image_pub = rospy.Publisher("debug_image",Image, queue_size=1)
+
+    def image_callback(self,frame,filtered_radar):
         #_, frame = vid.read()
 
         
@@ -64,7 +72,7 @@ class detector_tracker:
 
         t1 = time.time()
         if YOLO_FRAMEWORK == "tf":
-            pred_bbox = self.yolo.predict(image_data)
+            pred_bbox = self.yolo.predict(image_data,verbose=0)
         elif YOLO_FRAMEWORK == "trt":
             batched_input = tf.constant(image_data)
             result = self.yolo(batched_input)
@@ -115,6 +123,7 @@ class detector_tracker:
 
         # draw detection on frame
         image = draw_bbox(original_frame, tracked_bboxes, CLASSES=self.CLASSES, tracking=True)
+        #print (tracked_bboxes)
         '''
         t3 = time.time()
         self.times.append(t2-t1)
@@ -135,12 +144,27 @@ class detector_tracker:
         #print("Time: {:.2f}ms, Detection FPS: {:.1f}, total FPS: {:.1f}".format(ms, fps, fps2))
         #if output_path != '': out.write(image)
         image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        for i in range(len(filtered_radar)):
+            degree_tracked=math.degrees(math.atan(filtered_radar[i][0]/filtered_radar[i][1]))
+            radar_to_u=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+            radar_to_v=round(50*filtered_radar[i][0]+350)
+            r= 255 if filtered_radar[i][2]%2 else 0
+            g= 255 if filtered_radar[i][2]%3 else 0
+            b= 255 if filtered_radar[i][2]%4 else 0
+
+            cv2.circle(image, (radar_to_u,radar_to_v), 5, (b,g,r), -1)
         if self.show:
             cv2.imshow('output', image)
             
             if cv2.waitKey(25) & 0xFF == ord("q"):
                 cv2.destroyAllWindows()
                 sys.exit()
+        if(self.publish_ros):
+            image_out = Image()
+            image_out = self.bridge.cv2_to_imgmsg(image,"bgr8")
+            self.image_pub.publish(image_out)
+
+        return tracked_bboxes
             
     cv2.destroyAllWindows()
 
