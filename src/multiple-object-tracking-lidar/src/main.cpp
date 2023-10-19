@@ -38,6 +38,8 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <pcl/filters/passthrough.h>
+
 using namespace std;
 using namespace cv;
 
@@ -512,6 +514,12 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)
 
   else {
     // cout<<"ELSE firstFrame="<<firstFrame<<"\n";
+    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_x_cloud (
+        new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_x_cloud (
+        new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr unfiltered_y_cloud (
+        new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr clustered_cloud(
@@ -520,7 +528,20 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
         new pcl::search::KdTree<pcl::PointXYZ>);
 
-    pcl::fromROSMsg(*input, *input_cloud);
+    //pcl::fromROSMsg(*input, *input_cloud);
+    pcl::fromROSMsg(*input,*unfiltered_x_cloud);
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud (unfiltered_x_cloud);
+    pass.setFilterFieldName ("x");
+    pass.setFilterLimits (1.5, 7.0);
+    pass.filter (*filtered_x_cloud);
+
+    //pcl::fromROSMsg(*filtered_x_cloud,*unfiltered_y_cloud);
+    pcl::PassThrough<pcl::PointXYZ> pass2;
+    pass2.setInputCloud (filtered_x_cloud);
+    pass2.setFilterFieldName ("y");
+    pass2.setFilterLimits (-3.0, 3.0);
+    pass2.filter (*input_cloud);
 
     tree->setInputCloud(input_cloud);
 

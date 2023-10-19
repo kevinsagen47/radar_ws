@@ -65,8 +65,8 @@ def Load_Yolo_model():
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if len(gpus) > 0:
         print(f'GPUs {gpus}')
-        try: tf.config.experimental.set_memory_growth(gpus[0], True)
-        except RuntimeError: pass
+        #try: tf.config.experimental.set_memory_growth(gpus[0], True)
+        #except RuntimeError: pass
         
     if YOLO_FRAMEWORK == "tf": # TensorFlow detection
         if YOLO_TYPE == "yolov3":
@@ -297,9 +297,9 @@ def detect_image(Yolo, image_path, output_path, input_size=416, show=False, CLAS
 
 def Predict_bbox_mp(Frames_data, Predicted_data, Processing_times):
     gpus = tf.config.experimental.list_physical_devices('GPU')
-    if len(gpus) > 0:
-        try: tf.config.experimental.set_memory_growth(gpus[0], True)
-        except RuntimeError: print("RuntimeError in tf.config.experimental.list_physical_devices('GPU')")
+    #if len(gpus) > 0:
+    #    try: tf.config.experimental.set_memory_growth(gpus[0], True)
+    #    except RuntimeError: print("RuntimeError in tf.config.experimental.list_physical_devices('GPU')")
     Yolo = Load_Yolo_model()
     times = []
     while True:

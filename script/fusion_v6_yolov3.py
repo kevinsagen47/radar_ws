@@ -32,7 +32,15 @@ import keyboard
 import tf as transferfunction
 import threading
 import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import numpy as np
+from deep_sort import nn_matching
+from deep_sort.detection import Detection
+from deep_sort.tracker import Tracker
+from deep_sort import generate_detections as gdet
+from yolov3.utils import draw_bbox
+from yolov3.utils import Load_Yolo_model, image_preprocess, postprocess_boxes, nms, c, read_class_names
+from yolov3.configs import *
 clicked_x=50
 clicked_y=50
 radar_to_x=0
@@ -59,8 +67,6 @@ prev_cam_range=0
 prev_cam_azimuth=0
 exit=0
 cam_updating=0
-radar_to_y=0
-radar_to_x=0
 #######################################################################
 #                        DETECTION                                    #
 #######################################################################
@@ -127,7 +133,15 @@ class Detector:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_cb, queue_size=1, buff_size=2**24)
         self.sess = tf.Session(graph=detection_graph,config=config)
-        self.tracker = CentroidTracker(max_lost=100, tracker_output_format='mot_challenge')
+        #self.tracker = CentroidTracker(max_lost=100, tracker_output_format='mot_challenge')
+
+        max_cosine_distance = 0.7
+        nn_budget = None
+        #initialize deep sort object
+        model_filename = 'model_data/mars-small128.pb'
+        self.encoder = gdet.create_box_encoder(model_filename, batch_size=1)
+        metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
+        self.tracker = Tracker(metric)
         print("INITIATED<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,<<<<<<<<<<<<")
 
     def image_cb(self, data):
@@ -142,6 +156,7 @@ class Detector:
             print(e)
         image=cv2.cvtColor(cv_image,cv2.COLOR_BGR2RGB)
         image = self.adjust_gamma(image, gamma)
+        image_ori = cv_image
         # the array based representation of the image will be used later in order to prepare the
         # result image with boxes and labels on it.
         image_np = np.asarray(image)
@@ -187,134 +202,38 @@ class Detector:
             confidences.append(scores[0][i])
             #print ()
             class_ids.append(int(classes[0][i]))
+
+        bboxes = np.array(bboxes).astype('int')
+        class_ids = np.array(class_ids)
+        confidences = np.array(confidences)
+        features = np.array(self.encoder(image_ori, bboxes))
+        detections = [Detection(bboxes, confidences, class_name, feature) 
+                      for bboxes, confidences, class_name, feature 
+                      in zip(bboxes, confidences, class_ids, features)]
         #print (bboxes)
-        tracks = self.tracker.update(np.array(bboxes).astype('int'), np.array(class_ids).astype('int'), np.array(confidences))
+        #tracks = self.tracker.update(np.array(bboxes).astype('int'), np.array(class_ids).astype('int'), np.array(confidences))
         #'''
+        self.tracker.predict()
+        self.tracker.update(detections)
 
-        img=cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-        img=draw_tracks(img, tracks)
-
-
-        #states 
-        #0 not locked
-        #1 locked
-
-
-        '''
-        if(len(tracks)>0):
-            tracked_image=np.array(tracks).astype('int')
-            #print(tracked_image[0][1:6])
-            x_min=tracked_image[0][2]
-            x_max=tracked_image[0][2]+tracked_image[0][4]
-            print("min ",x_min," x_max ",x_max)
-            print (radar_to_x)
-        '''
-        current_frame_found=0
-        tracked_image=np.array(tracks).astype('int')
-        if(locked==0):
-            for i in range(len(tracked_image)):
-                x_min=tracked_image[i][2]
-                x_max=tracked_image[i][2]+tracked_image[0][4]
-                if(x_min<radar_to_x and x_max>radar_to_x):
-                    #print("radar_to_x locked with ID",tracked_image[i][1])
-                    locked=1
-                    locked_with=tracked_image[i][1]
-            if(locked==0 and 'locked_with' in locals()):
-                for i in range(len(tracked_image)):
-                    if(tracked_image[i][1]==locked_with):
-                        current_frame_found=1
-                        locked=1
-                        print("USING PREVIOUS LOCKED INFORMARTION<<<<<<<<<<<<<<<<<<<")
-                print("GONSKIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII")
+        # Obtain info from the tracks
+        tracked_bboxes = []
+        for track in self.tracker.tracks:
+            if not track.is_confirmed() or track.time_since_update > 5:
+                continue 
+            bbox = track.to_tlbr() # Get the corrected/predicted bounding box
+            class_name = track.get_class() #Get the class name of particular object
+            tracking_id = track.track_id # Get the ID for the particular track
+            index = class_name#key_list[val_list.index(class_name)] # Get predicted object index by object name
+            tracked_bboxes.append(bbox.tolist() + [tracking_id, index]) # Structure data, that we could use it with our draw_bbox function
 
         
-        if(locked==1):
-            for i in range(len(tracked_image)):
-                if(tracked_image[i][1]==locked_with):
-                    current_frame_found=1
-                    current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
-                    current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
-                    #x_min=tracked_image[i][2]
-                    #x_max=tracked_image[i][2]+tracked_image[0][4]
-                    #print("radar_to_x locked with ID",locked_with)
-                    #'''
-                    x_min_cali=tracked_image[i][2]
-                    x_max_cali=tracked_image[i][2]+tracked_image[0][4]
+        #print(tracked_bboxes)
+        #img = draw_bbox(image_ori, tracked_bboxes, tracking=True)
 
-                    u_to_degree=(640-current_ground_truth_x)/14.5
-                    degree_to_radian=u_to_degree*math.pi/180
-                    tan_degree=math.tan(degree_to_radian)
-                    if(u_to_degree!=0):
-                        cam_to_x=tracked_range*tan_degree
-
-                    cam_to_y=tracked_range
-                    #'''
-                    if((time.time()-last_radar)<0.5):
-                        #cam_to_y=tracked_range
-                        cam_range_speed=range_speed
-                    else:
-                        cam_range_speed=0
-                        #cam_to_y=500/(x_max_cali-x_min_cali)
-                    #'''
-                    
-                    last_cam_delta=time.time()-last_cam_update
-                    #cam_range_speed=(cam_to_y-prev_cam_range)/last_cam_delta#range in meters
-                    #cam_azimuth_speed=(cam_to_x-prev_cam_azimuth)/last_cam_delta#azimuth in meters
-                    if(radar_updating==0):
-                        cam_updating=1
-                        x=np.array([[cam_to_y],[cam_to_x],[cam_range_speed],[azimuth_speed]])
-                        #print(x[1][0],x[0][0])
-                        x_update=radar_kf.update(x,1000.)
-
-                    if((time.time()-last_radar)>0.5):
-                        publish_object(x_update)
-                    cam_updating=0
-                    last_cam_update=time.time()
-                    prev_cam_range=cam_to_y
-                    prev_cam_azimuth=cam_to_x
-                    
-                    
-
-
-                    #if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<0.5):
-                    #    #print(current_ground_truth_y," ",tracked_range)
-                    #    print(x_max_cali-x_min_cali," ",tracked_range)
-                    #'''
-
-        #current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
-        #current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
-        '''
-        degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
-        radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-        radar_to_y=round(50*tracked_range+350)
-        '''
-
-        if(current_frame_found==0):
-            locked=0
-            #print("depending on radar")
-        #else:
-        #    print("radar_to_x locked with ID",locked_with," error ",current_ground_truth_x-radar_to_x)
-        
-        
-
-        cv2.circle(img, (radar_to_x,radar_to_y), 5, (0,255,255), -1)
-        color = (128, 0, 0)#navy
-        #color =(255,150,0)#bright blue
-        '''
-        if data_velocity<0:
-            #cv2.putText(img, f'velocity:{data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            self.draw_text(img, f'velocity:{data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
-        else:
-            #cv2.putText(img, f'velocity:  {data_velocity}m/s',(10,620),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            self.draw_text(img, f'velocity:  {data_velocity}m/s', font_scale=1, pos=(10, 630), text_color_bg=(255, 255, 255))
-        '''
-        
-
-        #cv2.putText(img,     f'range  :{data_range}m',(10,660),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-        #self.draw_text(img, f'range  : {data_range}m', font_scale=1, pos=(10, 660), text_color_bg=(255, 255, 255))
-        
-        #cv2.imshow("Image window", img)
-
+        img=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #img=draw_tracks(img, tracks)
+        cv2.imshow("Image window", img)
         cv2.waitKey(3)
         image_out = Image()
         try:
@@ -575,11 +494,11 @@ def main(args):
     kf_marker= rospy.Publisher('kf_marker', MarkerArray, queue_size=1)
     m_array=MarkerArray()
     #rospy.Subscriber("/ti_mmwave/radar_scan",  RadarScan, callback2)
-    rospy.Subscriber("/viz",MarkerArray,radar_input)
+    #rospy.Subscriber("/viz",MarkerArray,radar_input)
     #rospy.Subscriber("/velo_range_array",Float32MultiArray,velo_range_callback)
     radar_kf=KF()
     kf_thread = threading.Thread(target=kf_predict)
-    kf_thread.start()
+    #kf_thread.start()
 
     key_thread = threading.Thread(target=keyboard_pressed)
     #key_thread.start()
@@ -592,3 +511,98 @@ def main(args):
 
 if __name__=='__main__':
     main(sys.argv)
+
+
+
+        #states 
+        #0 not locked
+        #1 locked
+
+
+'''
+if(len(tracks)>0):
+    tracked_image=np.array(tracks).astype('int')
+    #print(tracked_image[0][1:6])
+    x_min=tracked_image[0][2]
+    x_max=tracked_image[0][2]+tracked_image[0][4]
+    print("min ",x_min," x_max ",x_max)
+    print (radar_to_x)
+'''
+'''
+current_frame_found=0
+tracked_image=np.array(tracks).astype('int')
+if(locked==0):
+    for i in range(len(tracked_image)):
+        x_min=tracked_image[i][2]
+        x_max=tracked_image[i][2]+tracked_image[0][4]
+        if(x_min<radar_to_x and x_max>radar_to_x):
+            #print("radar_to_x locked with ID",tracked_image[i][1])
+            locked=1
+            locked_with=tracked_image[i][1]
+    if(locked==0 and 'locked_with' in locals()):
+        for i in range(len(tracked_image)):
+            if(tracked_image[i][1]==locked_with):
+                current_frame_found=1
+                locked=1
+                print("USING PREVIOUS LOCKED INFORMARTION<<<<<<<<<<<<<<<<<<<")
+        print("GONSKIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII")
+
+
+if(locked==1):
+    for i in range(len(tracked_image)):
+        if(tracked_image[i][1]==locked_with):
+            current_frame_found=1
+            current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
+            current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
+            #x_min=tracked_image[i][2]
+            #x_max=tracked_image[i][2]+tracked_image[0][4]
+            #print("radar_to_x locked with ID",locked_with)
+            
+            x_min_cali=tracked_image[i][2]
+            x_max_cali=tracked_image[i][2]+tracked_image[0][4]
+
+            u_to_degree=(640-current_ground_truth_x)/14.5
+            degree_to_radian=u_to_degree*math.pi/180
+            tan_degree=math.tan(degree_to_radian)
+            if(u_to_degree!=0):
+                cam_to_x=tracked_range*tan_degree
+
+            cam_to_y=tracked_range
+            
+            last_cam_delta=time.time()-last_cam_update
+            #cam_range_speed=(cam_to_y-prev_cam_range)/last_cam_delta#range in meters
+            #cam_azimuth_speed=(cam_to_x-prev_cam_azimuth)/last_cam_delta#azimuth in meters
+            if(radar_updating==0):
+                cam_updating=1
+                x=np.array([[cam_to_y],[cam_to_x],[cam_range_speed],[azimuth_speed]])
+                #print(x[1][0],x[0][0])
+                #x_update=radar_kf.update(x,1000.)
+
+            #if((time.time()-last_radar)>0.5):
+            #    publish_object(x_update)
+            cam_updating=0
+            last_cam_update=time.time()
+            prev_cam_range=cam_to_y
+            prev_cam_azimuth=cam_to_x
+            
+            
+
+
+            #if(x_min_cali<radar_to_x and x_max_cali>radar_to_x and (time.time()-last_radar)<0.5):
+            #    #print(current_ground_truth_y," ",tracked_range)
+            #    print(x_max_cali-x_min_cali," ",tracked_range)
+            
+'''
+#current_ground_truth_x=tracked_image[i][2]+tracked_image[0][4]*0.5
+#current_ground_truth_y=tracked_image[i][3]+tracked_image[0][5]*0.5
+'''
+degree_tracked=math.degrees(math.atan(tracked_azimuth/tracked_range))
+radar_to_x=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+radar_to_y=round(50*tracked_range+350)
+'''
+
+#if(current_frame_found==0):
+#    locked=0
+#    print("depending on radar")
+#else:
+#    print("radar_to_x locked with ID",locked_with," error ",current_ground_truth_x-radar_to_x)
