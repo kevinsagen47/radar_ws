@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
@@ -30,6 +30,7 @@ class detector_tracker:
         self.show=False
         self.publish_ros=True
         self.draw_radar_points=True
+        #self.verbose
         self.CLASSES=YOLO_COCO_CLASSES
         self.score_threshold=0.3
         self.iou_threshold=0.1
@@ -59,7 +60,7 @@ class detector_tracker:
         self.val_list = list(self.NUM_CLASS.values())
         self.image_pub = rospy.Publisher("debug_image",Image, queue_size=1)
 
-    def image_callback(self,frame,filtered_radar):
+    def image_callback(self,frame,radar_uv):
         #_, frame = vid.read()
 
         
@@ -144,15 +145,12 @@ class detector_tracker:
         #print("Time: {:.2f}ms, Detection FPS: {:.1f}, total FPS: {:.1f}".format(ms, fps, fps2))
         #if output_path != '': out.write(image)
         image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        for i in range(len(filtered_radar)):
-            degree_tracked=math.degrees(math.atan(filtered_radar[i][0]/filtered_radar[i][1]))
-            radar_to_u=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
-            radar_to_v=round(50*filtered_radar[i][0]+350)
-            r= 255 if filtered_radar[i][2]%2 else 0
-            g= 255 if filtered_radar[i][2]%3 else 0
-            b= 255 if filtered_radar[i][2]%4 else 0
+        for i in range(len(radar_uv)):
+            r= 255 if radar_uv[i][2]%2 else 0
+            g= 255 if radar_uv[i][2]%3 else 0
+            b= 255 if radar_uv[i][2]%4 else 0
+            cv2.circle(image, (radar_uv[i][0],radar_uv[i][1]), 5, (b,g,r), -1)
 
-            cv2.circle(image, (radar_to_u,radar_to_v), 5, (b,g,r), -1)
         if self.show:
             cv2.imshow('output', image)
             
