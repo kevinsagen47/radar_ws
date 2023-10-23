@@ -35,10 +35,13 @@ import numpy as np
 
 from deepsort_fusion import detector_tracker
 filtered_radar=np.array([[0.,0.,0.]])
-
+kf_timer=0
+last_radar=0
+last_update=0
 #CONFIGS
 logging=True
 image_recognition=True
+rate=0.5
 tol=5#tolerance
 def cartesian_to_uv(cartesian):
     #print(cartesian)
@@ -50,9 +53,9 @@ def cartesian_to_uv(cartesian):
             uv[i][1]=round(50*cartesian[i][0]+350)
     #print (uv)
     return uv.astype(int)
-
+prev_raw_radar=[[0,0],[0,0]]
 def radar_input(point):#radar update
-    global filtered_radar,raw_radar,tracked_cam_radar
+    global filtered_radar,raw_radar,tracked_cam_radar,radar_updating,last_radar,prev_raw_radar,rate
     filtered_radar=np.array([[0.,0.,0.]])
     #filtered_radar=[]
     raw_radar=np.array([
@@ -73,26 +76,58 @@ def radar_input(point):#radar update
                 filtered_radar=np.vstack([filtered_radar,np.append(raw_radar[i],i)])
             #'''
             #filtered_radar.append([raw_radar[i][0],raw_radar[i][1],i])
-    
-    if(tracked_cam_radar[0][1]!=-1 and tracked_cam_radar[1][1]!=-1):
-        publish_object([raw_radar[tracked_cam_radar[0][1]],raw_radar[tracked_cam_radar[1][1]]])
+    #for i in range(len(filtered_radar)):##########################################radar only
+    #    print(filtered_radar[i][0],filtered_radar[i][1]," ", end='')
+    #print(" ")
 
-        if logging:
-            print(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
+    if(tracked_cam_radar[0][1]!=-1 and tracked_cam_radar[1][1]!=-1):
+        radar_updating=1
+        
+        '''
+        last_radar_delta=(time.time()-last_radar)#*rate
+        #range_speed=(tracked_range-prev_tracked_range)/last_radar_delta#range in meters
+        #azimuth_speed=(tracked_azimuth-prev_tracked_azimuth)/last_radar_delta#azimuth in meters
+        tracked_radar1=[[raw_radar[tracked_cam_radar[0][1]][0]],#Px
+                        [raw_radar[tracked_cam_radar[0][1]][1]],#Py
+                        [((raw_radar[tracked_cam_radar[0][1]][0]-prev_raw_radar[0][0])/last_radar_delta)],#Vx
+                        [((raw_radar[tracked_cam_radar[0][1]][1]-prev_raw_radar[0][1])/last_radar_delta)]]#Vy
+        #print("tracked_radar1",tracked_radar1) 
+        tracked_radar2=[[raw_radar[tracked_cam_radar[1][1]][0]],#Px
+                        [raw_radar[tracked_cam_radar[1][1]][1]],#Py
+                        [((raw_radar[tracked_cam_radar[1][1]][0]-prev_raw_radar[1][0])/last_radar_delta)],#Vx
+                        [((raw_radar[tracked_cam_radar[1][1]][1]-prev_raw_radar[1][1])/last_radar_delta)]]#Vy
+        #print("tracked_radar2",tracked_radar2)
+        x_update1=radar_kf1.update(tracked_radar1,10.)
+        x_update2=radar_kf2.update(tracked_radar2,10.)
+        prev_raw_radar=[raw_radar[tracked_cam_radar[0][1]],raw_radar[tracked_cam_radar[1][1]]]
+        
+        publish_object([[x_update1[0][0],x_update1[1][0]],[x_update2[0][0],x_update2[1][0]]])
+        '''
+        publish_object([raw_radar[tracked_cam_radar[0][1]],raw_radar[tracked_cam_radar[1][1]]])
+        
+        print(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],#radar camera
                 raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
+        #if logging:
+            #print("ori",raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
+            #    raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
+            #print(x_update1[0][0],x_update1[1][0],
+            #        x_update2[0][0],x_update2[1][0])
             #for i in range(len(filtered_radar)):
             #    print(filtered_radar[i][0],filtered_radar[i][1]," ", end='')
             #print(" ")
-    #else:
-    #    print (tracked_cam_radar)
+        last_radar=time.time()
+        radar_updating=0
     
 time_since_start=time.time()
 prev_received_image=0
+radar_updating=0
 tracked_cam_radar=[[-1,-1,0,-1],[-1,-1,0,-1]]
+check_running=0
 #[cam ID, radar ID,count not radar in range,prev locked radar]
 def image_cb(frame):
-    global prev_received_image,tracked_cam_radar
+    global prev_received_image,tracked_cam_radar,check_running
     if((time.time()-prev_received_image)>0.25 ):
+        check_running=1
         prev_received_image=time.time()
         #print("calling image tracker")
         bridge = CvBridge()
@@ -131,7 +166,8 @@ def image_cb(frame):
                                 if(tracked_cam_radar[1][1]==-1 and tracked_cam_radar[0][1]==-1 and radar_uv[j][2]!=tracked_cam_radar[0][3]):#when both -1, both must have switched
                                     tracked_cam_radar[1][1]=tracked_cam_radar[0][3]
                                     tracked_cam_radar[1][3]=tracked_cam_radar[0][3]
-                                    #print("SWITCHEROO 0")
+                                    if logging==False:
+                                        print("SWITCHEROO 0")
 
                                 tracked_cam_radar[0]=[tracked_bboxes[0][4],radar_uv[j][2],0,radar_uv[j][2]]#pair IDs
                             else:#if yes then assign to the second bbox
@@ -143,7 +179,7 @@ def image_cb(frame):
                 radar1_uv=cartesian_to_uv(current_raw_radar)
                 if (radar1_uv[radar1_ID][0]<(tracked_bboxes[0][0]-tol) or radar1_uv[radar1_ID][0]>(tracked_bboxes[0][2]+tol)):
                     tracked_cam_radar[0][2]=tracked_cam_radar[0][2]+1
-                    if(tracked_cam_radar[0][2]==3):
+                    if(tracked_cam_radar[0][2]>=1):
                         tracked_cam_radar[0][1]=-1#unpair from bbox
                 else:
                     tracked_cam_radar[0][2]=0
@@ -160,7 +196,8 @@ def image_cb(frame):
                                 if(tracked_cam_radar[0][1]==-1 and tracked_cam_radar[1][1]==-1 and radar_uv[j][2]!=tracked_cam_radar[1][3]):
                                     tracked_cam_radar[0][1]=tracked_cam_radar[1][3] 
                                     tracked_cam_radar[0][3]=tracked_cam_radar[1][3]
-                                    #print("SWITCHEROO 1")
+                                    if logging==False:
+                                        print("SWITCHEROO 1")
 
                                 tracked_cam_radar[1]=[tracked_bboxes[1][4],radar_uv[j][2],0,radar_uv[j][2]]#pair IDs
                                 
@@ -173,21 +210,30 @@ def image_cb(frame):
                 radar2_uv=cartesian_to_uv(current_raw_radar)
                 if (radar2_uv[radar2_ID][0]<(tracked_bboxes[1][0]-tol) or radar2_uv[radar2_ID][0]>(tracked_bboxes[1][2]+tol)):
                     tracked_cam_radar[1][2]=tracked_cam_radar[1][2]+1
-                    if(tracked_cam_radar[1][2]==3):
+                    if(tracked_cam_radar[1][2]>=1):
                         tracked_cam_radar[1][1]=-1#unpair from bbox
                 else:
                     tracked_cam_radar[1][2]=0
-            #print (tracked_cam_radar)
+            if logging==False:
+                print (tracked_cam_radar)
+            #if(tracked_cam_radar[0][1]!=-1 or tracked_cam_radar[1][1]!=-1):
+            #    print(current_raw_radar[tracked_cam_radar[0][1]][0],current_raw_radar[tracked_cam_radar[0][1]][1],
+            #        current_raw_radar[tracked_cam_radar[1][1]][0],current_raw_radar[tracked_cam_radar[1][1]][1])
         ############################################################################
 
         
         #print(" ")
         #print(radar_uv)
-
+ 
 def publish_object(point_coordinate):            
     #global kf_marker,cam_to_x,cam_to_y,persistence_id
     global m_array
     #print(point_coordinate)
+    #if logging:
+    #    print(round(point_coordinate[0][0],3),
+    #          round(point_coordinate[0][1],3),
+    #          round(point_coordinate[1][0],3),
+    #          round(point_coordinate[1][1],3))
     m=Marker()
     m.header.frame_id="ti_mmwave"
     persistence_id=1
@@ -230,8 +276,41 @@ def publish_object(point_coordinate):
     #    m_array.markers.pop(0)
     kf_marker.publish(m_array)
 
+
+last_running=0
+def kf_predict():    
+    global kf_timer,last_update,check_running
+    
+    update_rate=0.05
+    while True:
+        #try:
+        #print ("time",time.time()-kf_timer,last_radar)
+        if(time.time()-kf_timer>update_rate and time.time()-last_radar<0.5):
+            kf_timer=time.time()
+            
+            if(radar_updating==0):#if kf is not radar_updating
+                x1_predicted=radar_kf1.predict((time.time()-last_update)*rate)#0.25 is rate played
+                x2_predicted=radar_kf2.predict((time.time()-last_update)*rate)#0.25 is rate played
+                #print("predict",[x1_predicted[0][0],x1_predicted[1][0],x2_predicted[0][0],x2_predicted[1][0]])
+                publish_object([[x1_predicted[0][0],x1_predicted[1][0]],[x2_predicted[0][0],x2_predicted[1][0]]])
+                
+                last_update=time.time()
+                #print("updatinggggggggggggggggg")
+            if(check_running==1):
+                check_running=0
+                last_running=time.time()
+            elif time.time()-last_running>5:
+                print("exiting thread")
+                break
+        else:
+            time.sleep(0.05)
+            if(exit==1):
+                break
+    sys.exit()
+
+
 def main(args):
-    global pose_pub,image_tracker,kf_marker,m_array#,radar_kf
+    global pose_pub,image_tracker,kf_marker,m_array,radar_kf1,radar_kf2
     rospy.init_node('detector_node')
     #pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)#arrow
     kf_marker= rospy.Publisher('kf_marker', MarkerArray, queue_size=1)
@@ -246,8 +325,9 @@ def main(args):
         rospy.Subscriber("/camera/color/image_raw", Image, image_cb, queue_size=1, buff_size=2**24)
         image_tracker=detector_tracker()
 
-    #radar_kf=KF()
-    #kf_thread = threading.Thread(target=kf_predict)
+    radar_kf1=KF()
+    radar_kf2=KF()
+    kf_thread = threading.Thread(target=kf_predict)
     #kf_thread.start()
 
     #key_thread = threading.Thread(target=keyboard_pressed)
