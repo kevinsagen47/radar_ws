@@ -20,16 +20,16 @@ class KF:
         self.x_prior = np.copy(self.x)
         self.P_prior = np.copy(self.P)
 
-        self.F = np.array([[1, 0, 0.5*delta_t, 0],
-                            [0, 1, 0, 0.5*delta_t],
+        self.F = np.array([[1, 0, 1, 0],
+                            [0, 1, 0, 1],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]])
 
         # Transformation matrix (Observation to State)
         self.H = np.array([[1, 0, 0, 0],
-                              [0, 1, 0, 0],
-                              [0, 0, 1, 0],
-                              [0, 0, 0, 1]])
+                           [0, 1, 0, 0],
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0]])
 
         self.R[2:, 2:] *= 10.  # observation error covariance
         self.P[4:, 4:] *= 1000.  # initial velocity error covariance
@@ -44,10 +44,12 @@ class KF:
         #if self.kf.x[7] + self.kf.x[2] <= 0:
         #    self.kf.x[7] *= 0.0
         #self.kf.predict()
+        '''
         self.F = np.array([[1, 0, 0.5*delta_t, 0],
                             [0, 1, 0, 0.5*delta_t],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]])
+        '''
         self.x = dot(self.F, self.x)                                    # x = Fx
         
         #x = dot(self.F, x)
@@ -63,8 +65,26 @@ class KF:
         :param new_detection: (np.ndarray) new observation in format [x1,x2,y1,y2]
         :return: KalmanTrack object class (itself after update)
         """
-        
+        '''
+        if self.x[1][0]!=0 and self.x[1][0]!=0 :
+            self.H = np.array([[1, 0, 0, 0],
+                               [0, 1, 0, 0],
+                               [1,0,0,0]])
+            #[(640/self.x[0][0])-950/self.x[1][0], -950*self.x[0][0]/(self.x[1][0]*self.x[1][0]), 0, 0]])
+            #print("px/py",(640/self.x[0][0])-950*self.x[0][0]/self.x[1][0],-950*self.x[0][0]*self.x[1][0]/(self.x[1][0]*self.x[1][0]))
+        else:
+            self.H = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0],
+                           [0, 0, 0, 0]])
+        '''
+        self.H = np.array([[1, 0, 0, 0],
+                               [0, 1, 0, 0],
+                               [0, 0, 0, 0],
+                               [0, 0, 0, 0]])
+        #'''
         y = z - np.dot(self.H, self.x)
+        hx= np.dot(self.H, self.x)
+        #print("y=z-hx ",round(y[2][0])," = ", z[2][0]," - ", hx[2][0])
         if(R>11):
             y[2][0]=0.
             y[3][0]=0.

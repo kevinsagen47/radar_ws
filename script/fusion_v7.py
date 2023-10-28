@@ -49,7 +49,8 @@ def cartesian_to_uv(cartesian):
     for i in range(len(cartesian)):
         if cartesian[i][0]!=0 and cartesian[i][1]!=0:
             degree_tracked=math.degrees(math.atan(cartesian[i][0]/cartesian[i][1]))
-            uv[i][0]=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+            #uv[i][0]=round(640-(degree_tracked*14.5+pow(degree_tracked,3)*0.0045))
+            uv[i][0]=round(640-(950*cartesian[i][0]/cartesian[i][1]))
             uv[i][1]=round(50*cartesian[i][0]+350)
     #print (uv)
     return uv.astype(int)
@@ -105,8 +106,8 @@ def radar_input(point):#radar update
         '''
         publish_object([raw_radar[tracked_cam_radar[0][1]],raw_radar[tracked_cam_radar[1][1]]])
         
-        print(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],#radar camera
-                raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
+        #rint(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],##########################radar camera
+        #        raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
         #if logging:
             #print("ori",raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
             #    raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
@@ -216,6 +217,27 @@ def image_cb(frame):
                     tracked_cam_radar[1][2]=0
             if logging==False:
                 print (tracked_cam_radar)
+            
+            u_to_degree=(640-((tracked_bboxes[0][0]+tracked_bboxes[0][2])/2))/14.5
+            degree_to_radian=u_to_degree*math.pi/180
+            tan_degree=math.tan(degree_to_radian)
+            cam_to_x=raw_radar[tracked_cam_radar[0][1]][1]*tan_degree
+
+            tracked_radar1=[[raw_radar[tracked_cam_radar[0][1]][0]],#Px
+                        [raw_radar[tracked_cam_radar[0][1]][1]],#Py
+                        [cam_to_x],[0]]#U
+                        #[((tracked_bboxes[0][0]+tracked_bboxes[0][2])/2)]]#U
+            x_update1=radar_kf1.update(tracked_radar1,10.)
+            '''
+            print("ori",raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],((tracked_bboxes[0][0]+tracked_bboxes[0][2])/2))
+            print("update",round(x_update1[0][0],3),round(x_update1[1][0],3),round(x_update1[2][0],3),round(x_update1[3][0],3))
+            '''
+            x1_predicted=radar_kf1.predict((time.time()-last_update)*rate)#0.25 is rate played
+            '''
+            print("predict",round(x1_predicted[0][0],3),round(x1_predicted[1][0],3),round(x1_predicted[2][0],3),round(x1_predicted[3][0],3))
+            print("   ")
+            '''
+            print(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],round(x1_predicted[0][0],3),round(x1_predicted[1][0],3))
             #if(tracked_cam_radar[0][1]!=-1 or tracked_cam_radar[1][1]!=-1):
             #    print(current_raw_radar[tracked_cam_radar[0][1]][0],current_raw_radar[tracked_cam_radar[0][1]][1],
             #        current_raw_radar[tracked_cam_radar[1][1]][0],current_raw_radar[tracked_cam_radar[1][1]][1])
