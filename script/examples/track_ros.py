@@ -33,7 +33,7 @@ from ultralytics.utils.plotting import save_one_box
 from examples.utils import write_mot_results
 
 
-
+import numpy as np
 import math
 import sys
 import cv2
@@ -76,39 +76,55 @@ def on_predict_start(predictor, persist=False):
 
 #@torch.no_grad()
 
-def run(args):
+def adjust_gamma(image, gamma):
+
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255
+            for i in np.arange(0, 256)]).astype("uint8")
+
+        return cv2.LUT(image, table)
+
+def run(data,args):    
     yolo=YOLO("weights/yolov8n.pt")    
+    bridge=CvBridge()
+    cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
+    image=cv2.cvtColor(cv_image,cv2.COLOR_BGR2RGB)
+    image = adjust_gamma(image, 1)
+    # the array based representation of the image will be used later in order to prepare the
+    # result image with boxes and labels on it.
+    image_np = np.asarray(image)
     
     results = yolo.track(
-        source=4,        
-        conf=args.conf,
-        show=True,
+        source=image_np,        
+        conf=0.5,
+        show=True,        
         stream=True
     )
     '''
     results = yolo.track(
         source=args.source,
         conf=args.conf,
-        #iou=args.iou,
+        iou=args.iou,
         show=args.show,
         stream=True,
-        #device=args.device,
-        #show_conf=args.show_conf,
-        #save_txt=args.save_txt,
-        #show_labels=args.show_labels,
-        #save=args.save,
-        #verbose=args.verbose,
-        #exist_ok=args.exist_ok,
-        #project=args.project,
-        #name=args.name,
-        #classes=args.classes,
-        #imgsz=args.imgsz,
-        #vid_stride=args.vid_stride,
-        #line_width=args.line_width
+        device=args.device,
+        show_conf=args.show_conf,
+        save_txt=args.save_txt,
+        show_labels=args.show_labels,
+        save=args.save,
+        verbose=args.verbose,
+        exist_ok=args.exist_ok,
+        project=args.project,
+        name=args.name,
+        classes=args.classes,
+        imgsz=args.imgsz,
+        vid_stride=args.vid_stride,
+        line_width=args.line_width
     )
     '''
-    print("conf = ",args.conf)
+    
     yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
+    
     if 'yolov8' not in str(args.yolo_model):
         # replace yolov8 model
         m = get_yolo_inferer(args.yolo_model)
@@ -118,21 +134,24 @@ def run(args):
             args=yolo.predictor.args
         )
         yolo.predictor.model = model
-
+    
+    
     # store custom args in predictor
     yolo.predictor.custom_args = args
-
+    
     for frame_idx, r in enumerate(results):
 
         if r.boxes.data.shape[1] == 7:
 
+            
             if yolo.predictor.source_type.webcam or args.source.endswith(VID_FORMATS):
                 p = yolo.predictor.save_dir / 'mot' / (args.source + '.txt')
                 yolo.predictor.mot_txt_path = p
+            
             elif 'MOT16' or 'MOT17' or 'MOT20' in args.source:
                 p = yolo.predictor.save_dir / 'mot' / (Path(args.source).parent.name + '.txt')
                 yolo.predictor.mot_txt_path = p
-
+            
             if args.save_mot:
                 write_mot_results(
                     yolo.predictor.mot_txt_path,
@@ -153,12 +172,17 @@ def run(args):
                         ),
                         BGR=True
                     )
-
+            
+             
+    
     if args.save_mot:
         print(f'MOT results saved to {yolo.predictor.mot_txt_path}')
+    
+    
+    
 
 
-def parse_opt():
+def parse_opt():    
     parser = argparse.ArgumentParser()
     parser.add_argument('--yolo-model', type=Path, default=WEIGHTS / 'yolov8n',
                         help='yolo model path')
@@ -166,7 +190,7 @@ def parse_opt():
                         help='reid model path')
     parser.add_argument('--tracking-method', type=str, default='deepocsort',
                         help='deepocsort, botsort, strongsort, ocsort, bytetrack')
-    parser.add_argument('--source', type=str, default='test_.mp4',
+    parser.add_argument('--source', type=str, default='4',
                         help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640],
                         help='inference size h,w')
@@ -176,7 +200,7 @@ def parse_opt():
                         help='intersection over union (IoU) threshold for NMS')
     parser.add_argument('--device', default='',
                         help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--show', action='store_true',
+    parser.add_argument('--show', action='store_true',default=True,
                         help='display tracking video results')
     parser.add_argument('--save', action='store_true',
                         help='save video tracking results')
@@ -215,6 +239,15 @@ def parse_opt():
     opt = parser.parse_args()
     return opt
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     opt = parse_opt()
-    run(opt)
+    rospy.init_node('detector_node')
+    rospy.Subscriber("/camera/color/image_raw",Image,run,(opt),queue_size=1,buff_size=2**24)
+    rospy.spin()
+    '''
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("ShutDown")
+    '''
+    #run(opt)
