@@ -84,18 +84,18 @@ def adjust_gamma(image, gamma):
 
         return cv2.LUT(image, table)
 
+
 def run(data,args):    
-    yolo=YOLO("weights/yolov8n.pt")    
+    yolo=YOLO("weights/yolov8n.pt")
+
     bridge=CvBridge()
     cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
     image=cv2.cvtColor(cv_image,cv2.COLOR_BGR2RGB)
-    image = adjust_gamma(image, 1)
-    # the array based representation of the image will be used later in order to prepare the
-    # result image with boxes and labels on it.
+    image = adjust_gamma(image, 1)    
     image_np = np.asarray(image)
     
     results = yolo.track(
-        source=image_np,        
+        source=4,
         conf=0.5,
         show=True,        
         stream=True
@@ -122,9 +122,14 @@ def run(data,args):
         line_width=args.line_width
     )
     '''
+    global track_on
+    track_on = False
+    if not track_on:
+        yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
+        print("Enable tracking")
+        track_on=True
     
-    yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
-    
+    #yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
     if 'yolov8' not in str(args.yolo_model):
         # replace yolov8 model
         m = get_yolo_inferer(args.yolo_model)
@@ -239,11 +244,15 @@ def parse_opt():
     opt = parser.parse_args()
     return opt
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    global track_on
+    track_on=False
     opt = parse_opt()
+    
     rospy.init_node('detector_node')
     rospy.Subscriber("/camera/color/image_raw",Image,run,(opt),queue_size=1,buff_size=2**24)
     rospy.spin()
+    
     '''
     try:
         rospy.spin()
