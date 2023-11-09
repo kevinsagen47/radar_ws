@@ -1,61 +1,147 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-object1_cam_x=radar_cam_callib(:,1);
-object1_radar_x=radar_cam_callib(:,3);
-object1_y=radar_cam_callib(:,4);
-
-object2_cam_x=radar_cam_callib(:,5);
-object2_radar_x=radar_cam_callib(:,7);
-object2_y=radar_cam_callib(:,8);
-
 rmse_array=[];
-for i=1:length(object1_y)
-path1=GetPointLineDistance(x_bayes1(i),object1_y(i), ...
-                            -1*route_p2(1,1),route_p2(2,1), ...
-                            -1*route_p2(1,2),route_p2(2,2));
+for i=1:length(scene_1_cam_radar_fusion(:,9))
+path1=GetPointLineDistance(scene_1_cam_radar_fusion(i,9),scene_1_cam_radar_fusion(i,10), ...
+                            -1*route3_p2(1,1),route3_p2(2,1), ...
+                            -1*route3_p2(1,2),route3_p2(2,2));
 
-path2=GetPointLineDistance(x_bayes1(i),object1_y(i), ...
-                            -1*route_p2(1,2),route_p2(2,2), ...
-                            -1*route_p2(1,3),route_p2(2,3));
+path2=GetPointLineDistance(scene_1_cam_radar_fusion(i,9),scene_1_cam_radar_fusion(i,10), ...
+                            -1*route3_p2(1,2),route3_p2(2,2), ...
+                            -1*route3_p2(1,3),route3_p2(2,3));
 
-path3=GetPointLineDistance(x_bayes1(i),object1_y(i), ...
-                            -1*route_p2(1,3),route_p2(2,3), ...
-                            -1*route_p2(1,4),route_p2(2,4));
+path3=GetPointLineDistance(scene_1_cam_radar_fusion(i,9),scene_1_cam_radar_fusion(i,10), ...
+                            -1*route3_p2(1,3),route3_p2(2,3), ...
+                            -1*route3_p2(1,4),route3_p2(2,4));
 
 rmse_array(end+1)=min([path1,path2,path3]);
 
 end
 RMSE_person1=mean(rmse_array)
-min_person1=min(rmse_array)
-max_person1=max(rmse_array)
+min_person1=min(rmse_array);
+max_person1=max(rmse_array);
 
 
 rmse_array=[];
-for i=1:length(object2_y)
-path1=GetPointLineDistance(x_bayes2(i),object2_y(i), ...
-                            -1*route_p1(1,1),route_p1(2,1), ...
-                            -1*route_p1(1,2),route_p1(2,2));
+for i=1:length(scene_1_cam_radar_fusion(:,9))
+path1=GetPointLineDistance(scene_1_cam_radar_fusion(i,4),scene_1_cam_radar_fusion(i,5), ...
+                            -1*route3_p1(1,1),route3_p1(2,1), ...
+                            -1*route3_p1(1,2),route3_p1(2,2));
 
-path2=GetPointLineDistance(x_bayes2(i),object2_y(i), ...
-                            -1*route_p1(1,2),route_p1(2,2), ...
-                            -1*route_p1(1,3),route_p1(2,3));
+path2=GetPointLineDistance(scene_1_cam_radar_fusion(i,4),scene_1_cam_radar_fusion(i,5), ...
+                            -1*route3_p1(1,2),route3_p1(2,2), ...
+                            -1*route3_p1(1,3),route3_p1(2,3));
 
-path3=GetPointLineDistance(x_bayes2(i),object2_y(i), ...
-                            -1*route_p1(1,3),route_p1(2,3), ...
-                            -1*route_p1(1,4),route_p1(2,4));
+path3=GetPointLineDistance(scene_1_cam_radar_fusion(i,4),scene_1_cam_radar_fusion(i,5), ...
+                            -1*route3_p1(1,3),route3_p1(2,3), ...
+                            -1*route3_p1(1,4),route3_p1(2,4));
 
 rmse_array(end+1)=min([path1,path2,path3]);
 
 end
 RMSE_person2=mean(rmse_array)
-min_person2=min(rmse_array)
-max_person2=max(rmse_array)
+min_person2=min(rmse_array);
+max_person2=max(rmse_array);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rmse_array=[];
+for i=1:length(scene_2_cam_radar_fusion(:,4))
+path1=GetPointLineDistance(scene_2_cam_radar_fusion(i,9),scene_2_cam_radar_fusion(i,10), ...
+                            -1*route2_p1(1,1),route2_p1(2,1), ...
+                            -1*route2_p1(1,2),route2_p1(2,2));
+
+path2=GetPointLineDistance(scene_2_cam_radar_fusion(i,9),scene_2_cam_radar_fusion(i,10), ...
+                            -1*route2_p1(1,2),route2_p1(2,2), ...
+                            -1*route2_p1(1,3),route2_p1(2,3));
+
+path3=GetPointLineDistance(scene_2_cam_radar_fusion(i,9),scene_2_cam_radar_fusion(i,10), ...
+                            -1*route2_p1(1,3),route2_p1(2,3), ...
+                            -1*route2_p1(1,4),route2_p1(2,4));
 
 
+rmse_array(end+1)=min([path1,path2,path3]);
 
-A=GetPointLineDistance(0.958,10.094,1.2,10.9,1.2,8.5)
+end
+RMSE_person1_scene2=mean(rmse_array)
+min_person1_scene2=min(rmse_array);
+max_person1_scene2=max(rmse_array);
+
+
+rmse_array=[];
+for i=1:length(scene_2_cam_radar_fusion(:,4))
+path1=GetPointLineDistance(scene_2_cam_radar_fusion(i,4),scene_2_cam_radar_fusion(i,5), ...
+                            -1*route2_p2(1,1),route2_p2(2,1), ...
+                            -1*route2_p2(1,2),route2_p2(2,2));
+
+path2=GetPointLineDistance(scene_2_cam_radar_fusion(i,4),scene_2_cam_radar_fusion(i,5), ...
+                            -1*route2_p2(1,2),route2_p2(2,2), ...
+                            -1*route2_p2(1,3),route2_p2(2,3));
+
+path3=GetPointLineDistance(scene_2_cam_radar_fusion(i,4),scene_2_cam_radar_fusion(i,5), ...
+                            -1*route2_p2(1,3),route2_p2(2,3), ...
+                            -1*route2_p2(1,4),route2_p2(2,4));
+
+rmse_array(end+1)=min([path1,path2,path3]);
+
+end
+RMSE_person2_scene2=mean(rmse_array)
+min_person2_scene2=min(rmse_array);
+max_person2_scene2=max(rmse_array);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 3 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rmse_array=[];
+for i=1:length(scene_3_cam_radar_fusion(:,4))
+path1=GetPointLineDistance(scene_3_cam_radar_fusion(i,9),scene_3_cam_radar_fusion(i,10), ...
+                            -1*route1_p2(1,1),route1_p2(2,1), ...
+                            -1*route1_p2(1,2),route1_p2(2,2));
+
+path2=GetPointLineDistance(scene_3_cam_radar_fusion(i,9),scene_3_cam_radar_fusion(i,10), ...
+                            -1*route1_p2(1,2),route1_p2(2,2), ...
+                            -1*route1_p2(1,3),route1_p2(2,3));
+
+path3=GetPointLineDistance(scene_3_cam_radar_fusion(i,9),scene_3_cam_radar_fusion(i,10), ...
+                            -1*route1_p2(1,3),route1_p2(2,3), ...
+                            -1*route1_p2(1,4),route1_p2(2,4));
+path4=GetPointLineDistance(scene_3_cam_radar_fusion(i,9),scene_3_cam_radar_fusion(i,10), ...
+                            -1*route1_p2(1,4),route1_p2(2,4), ...
+                            -1*route1_p2(1,5),route1_p2(2,5));
+
+rmse_array(end+1)=min([path1,path2,path3,path4]);
+
+end
+RMSE_person1_scene3=mean(rmse_array)
+min_person1_scene3=min(rmse_array);
+max_person1_scene3=max(rmse_array);
+
+
+rmse_array=[];
+for i=1:length(scene_3_cam_radar_fusion(:,4))
+path1=GetPointLineDistance(scene_3_cam_radar_fusion(i,4),scene_3_cam_radar_fusion(i,5), ...
+                            -1*route1_p1(1,1),route1_p1(2,1), ...
+                            -1*route1_p1(1,2),route1_p1(2,2));
+
+path2=GetPointLineDistance(scene_3_cam_radar_fusion(i,4),scene_3_cam_radar_fusion(i,5), ...
+                            -1*route1_p1(1,2),route1_p1(2,2), ...
+                            -1*route1_p1(1,3),route1_p1(2,3));
+
+path3=GetPointLineDistance(scene_3_cam_radar_fusion(i,4),scene_3_cam_radar_fusion(i,5), ...
+                            -1*route1_p1(1,3),route1_p1(2,3), ...
+                            -1*route1_p1(1,4),route1_p1(2,4));
+path4=GetPointLineDistance(scene_3_cam_radar_fusion(i,4),scene_3_cam_radar_fusion(i,5), ...
+                            -1*route1_p1(1,4),route1_p1(2,4), ...
+                            -1*route1_p1(1,5),route1_p1(2,5));
+
+rmse_array(end+1)=min([path1,path2,path3,path4]);
+
+end
+RMSE_person2_scene3=mean(rmse_array)
+min_person2_scene3=min(rmse_array);
+max_person2_scene3=max(rmse_array);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%A=GetPointLineDistance(0.958,10.094,1.2,10.9,1.2,8.5)
 
 
 
