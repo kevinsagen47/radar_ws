@@ -231,8 +231,8 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
     */
 
   visualization_msgs::MarkerArray clusterMarkers;
-
-  for (int i = 0; i < 6; i++) {
+ 
+  for (int i = 0; i < 6; i++) { -0
     visualization_msgs::Marker m;
 
     m.id = i;
@@ -335,8 +335,11 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr &input)
     float dvy = 0.01f; // 1.0
     float dx = 1.0f;
     float dy = 1.0f;
-    KF0.transitionMatrix = (Mat_<float>(4, 4) << dx, 0, 1, 0, 0, dy, 0, 1, 0, 0,
-                            dvx, 0, 0, 0, 0, dvy);
+    KF0.transitionMatrix = (Mat_<float>(4, 4) << 
+                            dx, 0, 1, 0,
+                            0, dy, 0, 1, 
+                            0, 0,dvx, 0, 
+                            0, 0, 0, dvy);
     KF1.transitionMatrix = (Mat_<float>(4, 4) << dx, 0, 1, 0, 0, dy, 0, 1, 0, 0,
                             dvx, 0, 0, 0, 0, dvy);
     KF2.transitionMatrix = (Mat_<float>(4, 4) << dx, 0, 1, 0, 0, dy, 0, 1, 0, 0,
