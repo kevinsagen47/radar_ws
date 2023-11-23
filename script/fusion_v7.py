@@ -74,9 +74,9 @@ def radar_input(point):#radar update
                 filtered_radar[0]= np.append(raw_radar[i],i)    
             else:
                 filtered_radar=np.vstack([filtered_radar,np.append(raw_radar[i],i)])
-    #for i in range(len(filtered_radar)):##########################################raw radar only
-    #    print(filtered_radar[i][0],filtered_radar[i][1], end='')
-    #print(" ")
+    for i in range(len(filtered_radar)):##########################################raw radar only
+        print(filtered_radar[i][0],filtered_radar[i][1], end=' ')
+    print(" ")
 
     if(tracked_cam_radar[0][1]!=-1 and tracked_cam_radar[1][1]!=-1 and camera_updating==0):
         '''
@@ -208,14 +208,14 @@ def image_cb(frame):
             x_update2=radar_kf2.update([[x_bayes2],[raw_radar[tracked_cam_radar[1][1]][1]],[0],[0]])
             publish_object([[x_update1[0][0],x_update1[1][0]],[x_update2[0][0],x_update2[1][0]]])
 
-            #'''
+            '''
             ###############################################compare radar and camera#################################
             print(round(cam_to_x,3),raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
                   round(x_update1[0][0],3),round(x_update1[1][0],3),
                   round(cam_to_x2,3),raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1],
                   round(x_update2[0][0],3),round(x_update2[1][0],3))
             ########################################################################################################
-            #'''
+            '''
  
 def publish_object(point_coordinate):            
     #global kf_marker,cam_to_x,cam_to_y,persistence_id
@@ -311,12 +311,12 @@ def main(args):
     rospy.Subscriber("/viz",MarkerArray,radar_input)
     
     
-    #'''
+    '''
     if(image_recognition):
         #image_sub = 
         rospy.Subscriber("/camera/color/image_raw", Image, image_cb, queue_size=1, buff_size=2**24)
         image_tracker=detector_tracker()
-    #'''
+    '''
     radar_kf1=KF()
     radar_kf2=KF()
     kf_thread = threading.Thread(target=kf_predict)
