@@ -232,7 +232,7 @@ void KFT(const std_msgs::Float32MultiArray ccs) {
 
   visualization_msgs::MarkerArray clusterMarkers;
  
-  for (int i = 0; i < 6; i++) { -0
+  for (int i = 0; i < 6; i++) {
     visualization_msgs::Marker m;
 
     m.id = i;
