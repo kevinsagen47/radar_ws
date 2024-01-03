@@ -29,8 +29,8 @@ route3_p2 = [3 1 3 3;
              9 7 5 9]*0.6;
 
 %%plot  route 1/2/3
-route_p1 = route1_p1;
-route_p2 = route1_p2;
+route_p1 = route3_p1;
+route_p2 = route3_p2;
     
 hold on
 scatter(route_p1(1,:),route_p1(2,:),'red')

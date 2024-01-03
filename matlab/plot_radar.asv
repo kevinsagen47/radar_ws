@@ -37,18 +37,18 @@ object1_y=all_scene_1(:,7);
 object1_radar_x=all_scene_1(:,10);
 object1_radar_y=all_scene_1(:,11);
 
-object_fusion_x1=all_scene_1(:,6);
-object_fusion_y1=all_scene_1(:,7);
+object_fusion_x1=all_scene_1(:,7);
+object_fusion_y1=all_scene_1(:,6);
 
-object2_cam_x=all_scene_1(:,17);
-object2_y=all_scene_1(:,18);
+object2_cam_x=all_scene_1(:,18);
+object2_y=all_scene_1(:,17);
 
 %object2_radar_x=scene_1_cam_radar_fusion(:,7);
 object2_radar_x=all_scene_1(:,21);
 object2_radar_y=all_scene_1(:,22);
 
-object_fusion_x2=all_scene_1(:,17);
-object_fusion_y2=all_scene_1(:,18);
+object_fusion_x2=all_scene_1(:,18);
+object_fusion_y2=all_scene_1(:,17);
 
 cam_cov1=cov(object1_cam_x);
 radar_cov1=cov(object1_radar_x);

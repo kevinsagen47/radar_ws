@@ -69,8 +69,8 @@ class KF:
         
         #x_in_polar=[[c2],[math.atan(px/py)]]
         x_in_polar=[[c2],[math.atan(py/px)]]
-        print("z_ ",x_in_polar)
-        print("z  ",z)
+        #print("z_ ",x_in_polar)
+        #print("z  ",z)
         
         y =  np.array(z) - np.array(x_in_polar)
         #print("y  ",y)

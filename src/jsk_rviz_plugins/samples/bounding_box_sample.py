@@ -22,7 +22,7 @@ while not rospy.is_shutdown():
   box_arr.header.stamp = now
   box_a.header.frame_id = "map"
   box_b.header.frame_id = "map"
-  box_arr.header.frame_id = "map"
+  box_arr.header.frame_id = "map"                                                                                                                      
   q = quaternion_about_axis((counter % 100) * math.pi * 2 / 100.0, [0, 0, 1])
   box_a.pose.orientation.x = q[0]
   box_a.pose.orientation.y = q[1]

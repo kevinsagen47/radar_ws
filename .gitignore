@@ -3,3 +3,4 @@
 .catkin_workspace
 src/CMakeLists.txt
 *.bag
+*.weights
