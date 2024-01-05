@@ -255,7 +255,7 @@ def image_cb(frame):
             max_theta_cam2=(640-(tracked_bboxes[1][2]))/876
             min_theta_cam2=(640-(tracked_bboxes[1][0]))/876
             #  1,           2          , 3              4          5           6       7          8        9       10          11      
-            #theta camera, theta radar, theta fused, xmax theta, xmin theta, fused x, fused y, width m, height  m, radar x, radar y
+            #theta camera, theta radar, theta fused, xmin theta, xmax theta, fused x, fused y, width m, height  m, radar x, radar y
             print (theta_cam1,theta_radar1,theta_fuse1,max_theta_cam1,min_theta_cam1,x_update1[1][0],x_update1[0][0],width1,height1,raw_radar[tracked_cam_radar[0][1]][0],y1
                    ,theta_cam2,theta_radar2,theta_fuse2,max_theta_cam2,min_theta_cam2,x_update2[1][0],x_update2[0][0],width2,height2,raw_radar[tracked_cam_radar[1][1]][0],y2)
             '''
