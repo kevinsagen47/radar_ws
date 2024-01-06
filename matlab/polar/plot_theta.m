@@ -1,3 +1,6 @@
+%plot theta vs frame
+% figure 1 ,3 , 5 plots camera, bbox, radar, and ground truth
+% figure 2,4,6 plots fused result
 %{
 %%%%%%%%%%%%%%%%%%%%%%%%%   SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%
 length_1=97;

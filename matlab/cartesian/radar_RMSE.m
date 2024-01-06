@@ -1,3 +1,5 @@
+%calculate RMSE of radar data, with camera identification, 3 scenarios
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmse_array=[];
 for i=1:length(scene_1_cam_radar_fusion(:,1))

@@ -1,3 +1,4 @@
+%plot RMSE vs frame
 f=figure(1)
 f.Position = [700 100 550*1.4 400*1.4];
 m_red=[0.8500 0.3250 0.0980];

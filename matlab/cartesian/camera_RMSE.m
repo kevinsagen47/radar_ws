@@ -1,4 +1,4 @@
-%calculate RMSE of camera
+%only camera RMSE 3 scenarios
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmse_array=[];

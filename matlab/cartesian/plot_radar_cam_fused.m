@@ -1,34 +1,6 @@
+%figure 1 plot raw camera data and radar data
+%figure 2 plot fused result
 clf
-%{
-object1_cam_x=scene_3_cam_radar_fusion(:,1);
-object1_y=scene_3_cam_radar_fusion(:,3);
-
-%object1_radar_x=scene_1_cam_radar_fusion(:,2);
-object1_radar_x=scene_3_radar(:,1);
-object1_radar_y=scene_3_radar(:,2);
-
-object_fusion_x1=scene_3_cam_radar_fusion(:,4);
-object_fusion_y1=scene_3_cam_radar_fusion(:,5);
-
-object2_cam_x=scene_3_cam_radar_fusion(:,6);
-object2_y=scene_3_cam_radar_fusion(:,8);
-
-%object2_radar_x=scene_1_cam_radar_fusion(:,7);
-object2_radar_x=scene_3_radar(:,3);
-object2_radar_y=scene_3_radar(:,4);
-
-object_fusion_x2=scene_3_cam_radar_fusion(:,9);
-object_fusion_y2=scene_3_cam_radar_fusion(:,10);
-
-cam_cov1=cov(object1_cam_x);
-radar_cov1=cov(object1_radar_x);
-%x_bayes1=((object1_radar_x/radar_cov1^2)+(object1_cam_x/cam_cov1^2))/((1/radar_cov1^2)+(1/cam_cov1^2));
-
-
-cam_cov2=cov(object2_cam_x);
-radar_cov2=cov(object2_radar_x);
-%x_bayes2=((object2_radar_x/radar_cov2^2)+(object2_cam_x/cam_cov2^2))/((1/radar_cov2^2)+(1/cam_cov2^2));
-%}
 
 object1_cam_x=all_scene_1(:,6);
 object1_y=all_scene_1(:,7);
