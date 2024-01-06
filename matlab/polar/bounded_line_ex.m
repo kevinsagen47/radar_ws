@@ -1,3 +1,5 @@
+%test platform for bounded line
+
 x = double(theta_x_axis);%linspace(0, 2*pi, 50);
 y1 = double(cam_theta1);%sin(x);
 %y2 = cos(x);

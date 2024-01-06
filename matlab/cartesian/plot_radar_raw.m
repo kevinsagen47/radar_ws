@@ -1,3 +1,4 @@
+%plot raw data of radar
 scatter(radar_raw_scene2(:,1),radar_raw_scene2(:,2),"filled")
 hold on
 %CAMERA

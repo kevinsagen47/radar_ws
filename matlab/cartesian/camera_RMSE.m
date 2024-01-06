@@ -1,3 +1,5 @@
+%calculate RMSE of camera
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmse_array=[];
 for i=1:length(scene_1_cam_radar_fusion(:,1))
