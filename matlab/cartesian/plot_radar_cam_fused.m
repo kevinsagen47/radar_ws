@@ -1,3 +1,4 @@
+%only one scenario
 %figure 1 plot raw camera data and radar data
 %figure 2 plot fused result
 clf

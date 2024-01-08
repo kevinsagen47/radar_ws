@@ -77,21 +77,20 @@ def radar_input(point):#radar update
                 filtered_radar[0]= np.append(raw_radar[i],i)    
             else:
                 filtered_radar=np.vstack([filtered_radar,np.append(raw_radar[i],i)])
-    '''
+    #'''raw radar without camera
     for i in range(len(filtered_radar)):##########################################raw radar only
         print(filtered_radar[i][0],filtered_radar[i][1], end=' ')
     print(" ")
-    '''
+    #'''
     if(tracked_cam_radar[0][1]!=-1 and tracked_cam_radar[1][1]!=-1 and camera_updating==0):
         '''
-        ################## print raw radar ###############################################
+        ################## print raw radar categorized###############################################
         print(raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
                 raw_radar[tracked_cam_radar[1][1]][0],raw_radar[tracked_cam_radar[1][1]][1])
         ##################################################################################
         '''
         last_radar=time.time()
         radar_updating=0
-    
 time_since_start=time.time()
 prev_received_image=0
 radar_updating=0
@@ -254,10 +253,13 @@ def image_cb(frame):
 
             max_theta_cam2=(640-(tracked_bboxes[1][2]))/876
             min_theta_cam2=(640-(tracked_bboxes[1][0]))/876
+            '''
+            #PRINT ALLL
             #  1,           2          , 3              4          5           6       7          8        9       10          11      
             #theta camera, theta radar, theta fused, xmin theta, xmax theta, fused x, fused y, width m, height  m, radar x, radar y
             print (theta_cam1,theta_radar1,theta_fuse1,max_theta_cam1,min_theta_cam1,x_update1[1][0],x_update1[0][0],width1,height1,raw_radar[tracked_cam_radar[0][1]][0],y1
                    ,theta_cam2,theta_radar2,theta_fuse2,max_theta_cam2,min_theta_cam2,x_update2[1][0],x_update2[0][0],width2,height2,raw_radar[tracked_cam_radar[1][1]][0],y2)
+            '''
             '''
             ###############################################compare radar and camera#################################
             print(round(cam_to_x,3),raw_radar[tracked_cam_radar[0][1]][0],raw_radar[tracked_cam_radar[0][1]][1],
