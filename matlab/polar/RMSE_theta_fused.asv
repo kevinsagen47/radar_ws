@@ -1,10 +1,4 @@
 %RMSE of 3 scenarios fusion 
-theta2_gt_p1_s3=[[1,15,45,73,98];-1*theta_gt_p1_s3];
-theta2_gt_p2_s3=[[1,20,33,50,73,98];-1*theta_gt_p2_s3];
-theta2_gt_p2_s2=[[1,25,64,95];-1*theta_gt_p2_s2];
-theta2_gt_p2_s1=[[1,29,52,95];-1*theta_gt_p2_s1];
-theta2_gt_p1_s1=[[1,64,89,97];-1*theta_gt_p1_s1];
-theta2_gt_p1_s2=[[1,28,66,95];-1*theta_gt_p1_s2];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmse_array=[];
 length_1=97;
@@ -37,16 +31,14 @@ end
 error_theta_fused_p2_s1=rmse_array;
 RMSE_theta_fused_p2_s1=rms(rmse_array)
 
-f=figure(1);
+f=figure(1)
 clf(f,"reset")
-plot(error_theta_fused_p1_s1,'LineWidth',2);
+plot(error_theta_fused_p1_s1);
 hold on;
-plot(error_theta_fused_p2_s1,'LineWidth',2);
+plot(error_theta_fused_p2_s1);
 hold off;
 xlabel('Frame (#)')
 ylabel('Error (rad)')
-ylim([0 0.35])
-lgd=legend('Object 1','Object 2','Location','Best');
 title('Fused Scenario 1 Azimuth Error')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -82,24 +74,22 @@ end
 error_theta_fused_p2_s2=rmse_array;
 RMSE_theta_fused_p2_s2=rms(rmse_array)
 
-f=figure(2);
+f=figure(2)
 clf(f,"reset")
-plot(error_theta_fused_p1_s2,'LineWidth',2);
+plot(error_theta_fused_p1_s2);
 hold on;
-plot(error_theta_fused_p2_s2,'LineWidth',2);
+plot(error_theta_fused_p2_s2);
 hold off;
 xlabel('Frame (#)')
 ylabel('Error (rad)')
-ylim([0 0.35])
-lgd=legend('Object 1','Object 2','Location','Best');
 title('Fused Scenario 2 Azimuth Error')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% SCENARIO 3 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmse_array=[];
 length_1=113;
-fused_theta1=all_scene_3(16:length_1,3);
-fused_theta2=all_scene_3(16:length_1,14);
+fused_theta1=all_scene_2(16:length_1,3);
+fused_theta2=all_scene_2(16:length_1,14);
 theta_gt1=theta2_gt_p1_s3;
 theta_gt2=theta2_gt_p2_s3;
 for path_set=1:(length(theta_gt1(1,:))-1)
@@ -127,16 +117,14 @@ end
 error_theta_fused_p2_s3=rmse_array;
 RMSE_theta_fused_p2_s3=rms(rmse_array)
 
-f=figure(3);
+f=figure(3)
 clf(f,"reset")
-plot(error_theta_fused_p1_s3,'LineWidth',2);
+plot(error_theta_fused_p1_s3);
 hold on;
-plot(error_theta_fused_p2_s3,'LineWidth',2);
+plot(error_theta_fused_p2_s3);
 hold off;
 xlabel('Frame (#)')
 ylabel('Error (rad)')
-ylim([0 0.35])
-lgd=legend('Object 1','Object 2','Location','Best');
 title('Fused Scenario 3 Azimuth Error')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

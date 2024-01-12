@@ -35,7 +35,7 @@ set([l,p],'linestyle','none');
 %scatter(theta_x_axis,cam_theta1,"filled")
 scatter(theta_x_axis,radar_theta1,"filled")
 %scatter(theta_x_axis,fused_theta1,"filled")
-plot([1,64,89,97],-1*theta_gt_p1_s1,'c','LineWidth',1)
+plot(theta2_gt_p1_s1(1,:),theta2_gt_p1_s1(2,:),'c','LineWidth',1)
 
 
 
@@ -49,12 +49,12 @@ set([l,p],'linestyle','none');
 %scatter(theta_x_axis,cam_theta2,"filled")
 scatter(theta_x_axis,radar_theta2,"filled")
 %scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,29,52,95],-1*theta_gt_p2_s1,'red','LineWidth',1)
+plot(theta2_gt_p2_s1(1,:),theta2_gt_p2_s1(2,:),'red','LineWidth',1)
 lgd=legend('BBox Object 1','Camera Object 1','','Radar Object 1',"Ground Truth Object 1",'BBox Object 1','Camera Object 2','','Radar Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.6])
-title('Radar vs Camera Azimuth Angle Scenario 1')
+title('Radar vs Camera Azimuth Scenario 1')
 hold off
 
 f2=figure(2);
@@ -62,14 +62,14 @@ clf(f2,'reset')
 f2.Position = [100 100 550*1.4 400*1.4];
 hold on
 scatter(theta_x_axis,fused_theta1,"filled")
-plot([1,64,89,97],-1*theta_gt_p1_s1,'c','LineWidth',1)
+plot(theta2_gt_p1_s1(1,:),theta2_gt_p1_s1(2,:),'c','LineWidth',1)
 scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,29,52,95],-1*theta_gt_p2_s1,'red','LineWidth',1)
+plot(theta2_gt_p2_s1(1,:),theta2_gt_p2_s1(2,:),'red','LineWidth',1)
 lgd=legend('Fused Object 1',"Ground Truth Object 1",'Fused Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.6])
-title('Fused Azimuth Angle Scenario 1')
+title('EKF Output Azimuth Scenario 1')
 hold off
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%}
@@ -108,7 +108,7 @@ set([l,p],'linestyle','none');
 scatter(theta_x_axis,radar_theta1,"filled")
 %scatter(theta_x_axis,fused_theta1,"filled")
 
-plot([1,25,64,95],-1*theta_gt_p2_s2,'c','LineWidth',1)
+plot(theta2_gt_p2_s2(1,:),theta2_gt_p2_s2(2,:),'c','LineWidth',1)
 
 
 %bounded lines
@@ -121,12 +121,12 @@ set([l,p],'linestyle','none');
 %scatter(theta_x_axis,cam_theta2,"filled")
 scatter(theta_x_axis,radar_theta2,"filled")
 %scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,28,66,95],-1*theta_gt_p1_s2,'red','LineWidth',1)
+plot(theta2_gt_p1_s2(1,:),theta2_gt_p1_s2(2,:),'red','LineWidth',1)
 lgd=legend('BBox Object 1','Camera Object 1','','Radar Object 1',"Ground Truth Object 1",'BBox Object 1','Camera Object 2','','Radar Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.8])
-title('Radar vs Camera Azimuth Angle Scenario 2')
+title('Radar vs Camera Azimuth Scenario 2')
 hold off
 %%{
 f2=figure(4);
@@ -134,14 +134,14 @@ clf(f2,'reset')
 f2.Position  = [100 100 550*1.4 400*1.4];
 hold on
 scatter(theta_x_axis,fused_theta1,"filled")
-plot([1,25,64,95],-1*theta_gt_p2_s2,'c','LineWidth',1)
+plot(theta2_gt_p2_s2(1,:),theta2_gt_p2_s2(2,:),'c','LineWidth',1)
 scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,28,66,95],-1*theta_gt_p1_s2,'red','LineWidth',1)
+plot(theta2_gt_p1_s2(1,:),theta2_gt_p1_s2(2,:),'red','LineWidth',1)
 lgd=legend('Fused Object 1',"Ground Truth Object 1",'Fused Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.8])
-title('Fused Azimuth Angle Scenario 2')
+title('EKF Output Azimuth Scenario 2')
 hold off
 %%}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -180,7 +180,7 @@ set([l,p],'linestyle','none');
 %scatter(theta_x_axis,cam_theta1,"filled")
 scatter(theta_x_axis,radar_theta1,"filled")
 %scatter(theta_x_axis,fused_theta1,"filled")
-plot([1,15,45,73,98],-1*theta_gt_p1_s3,'c','LineWidth',1)
+plot(theta2_gt_p1_s3(1,:),theta2_gt_p1_s3(2,:),'c','LineWidth',1)
 
 
 
@@ -194,12 +194,12 @@ set([l,p],'linestyle','none');
 %scatter(theta_x_axis,cam_theta2,"filled")
 scatter(theta_x_axis,radar_theta2,"filled")
 %scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,20,33,50,73,98],-1*theta_gt_p2_s3,'r','LineWidth',1)
+plot(theta2_gt_p2_s3(1,:),theta2_gt_p2_s3(2,:),'r','LineWidth',1)
 lgd=legend('BBox Object 1','Camera Object 1','','Radar Object 1',"Ground Truth Object 1",'BBox Object 1','Camera Object 2','','Radar Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.8])
-title('Radar vs Camera Azimuth Angle Scenario 3')
+title('Radar vs Camera Azimuth Scenario 3')
 hold off
 %%{
 f2=figure(6);
@@ -207,14 +207,14 @@ clf(f2,'reset')
 f2.Position  = [100 100 550*1.4 400*1.4];
 hold on
 scatter(theta_x_axis,fused_theta1,"filled")
-plot([1,15,45,73,98],-1*theta_gt_p1_s3,'c','LineWidth',1)
+plot(theta2_gt_p1_s3(1,:),theta2_gt_p1_s3(2,:),'c','LineWidth',1)
 scatter(theta_x_axis,fused_theta2,"filled")
-plot([1,20,33,50,73,98],-1*theta_gt_p2_s3,'r','LineWidth',1)
+plot(theta2_gt_p2_s3(1,:),theta2_gt_p2_s3(2,:),'r','LineWidth',1)
 lgd=legend('Fused Object 1',"Ground Truth Object 1",'Fused Object 2',"Ground Truth Object 2",'Location','Best','NumColumns',2);
 xlabel('Frame (#)')
 ylabel('Azimuth (rad)')
 ylim([-0.8 0.8])
-title('Fused Azimuth Angle Scenario 3')
+title('EKF Output Azimuth Scenario 3')
 hold off
 %%}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

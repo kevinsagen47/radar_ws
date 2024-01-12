@@ -14,11 +14,11 @@ lgd=legend('Radar Object 1',"Ground Truth Object 1",'Radar Object 2',"Ground Tru
 
 
 hold off
-xlabel('x(m)')
-ylabel('y(m)')
+xlabel('x-axis(m)')
+ylabel('y-axis(m)')
 ylim([-0.5 6])
 
-title('Object Tracking Only Radar Scenario 1')
+title('Radar Only Object Tracking Scenario 1')
 %%}
 
 
@@ -34,9 +34,9 @@ plot(-1*route2_p1(1,:),route2_p1(2,:),'red','LineWidth',2)
 draw_sensor_0_0()
 hold off
 lgd=legend('Radar Object 1',"Ground Truth Object 1",'Radar Object 2',"Ground Truth Object 2","","","",'Location','Best','NumColumns',2);
-xlabel('x(m)')
-ylabel('y(m)')
-title('Object Tracking Only Radar Scenario 2')
+xlabel('x-axis(m)')
+ylabel('y-axis(m)')
+title('Radar Only Object Tracking Scenario 2')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%   SCENARIO 3 %%%%%%%%%%%%%%%%%%%%%%%%%
 f1 = figure(3);
@@ -50,8 +50,8 @@ plot(-1*route1_p2(1,:),route1_p2(2,:),'red','LineWidth',2)
 draw_sensor_0_0()
 hold off
 lgd=legend('Radar Object 1',"Ground Truth Object 1",'Radar Object 2',"Ground Truth Object 2","","","",'Location','Best','NumColumns',2);
-xlabel('x(m)')
-ylabel('y(m)')
-title('Object Tracking Only Radar Scenario 3')
+xlabel('x-axis(m)')
+ylabel('y-axis(m)')
+title('Radar Only Object Tracking Scenario 3')
 
 
